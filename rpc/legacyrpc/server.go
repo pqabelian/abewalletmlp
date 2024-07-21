@@ -16,8 +16,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/abesuite/abewallet/chain"
-	"github.com/abesuite/abewallet/wallet"
+	"github.com/abesuite/abewalletmlp/chain"
+	"github.com/abesuite/abewalletmlp/wallet"
 	"github.com/gorilla/websocket"
 )
 

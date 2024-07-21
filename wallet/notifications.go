@@ -6,8 +6,8 @@ import (
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewallet/walletdb"
-	"github.com/abesuite/abewallet/wtxmgr"
+	"github.com/abesuite/abewalletmlp/walletdb"
+	"github.com/abesuite/abewalletmlp/wtxmgr"
 )
 
 // TODO: It would be good to send errors during notification creation to the rpc

@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abewallet/walletdb"
-	"github.com/abesuite/abewallet/walletdb/migration"
+	"github.com/abesuite/abewalletmlp/walletdb"
+	"github.com/abesuite/abewalletmlp/walletdb/migration"
 	"github.com/bits-and-blooms/bitset"
 	"time"
 )

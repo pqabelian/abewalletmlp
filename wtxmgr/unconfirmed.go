@@ -2,7 +2,7 @@ package wtxmgr
 
 import (
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abewallet/walletdb"
+	"github.com/abesuite/abewalletmlp/walletdb"
 	"math/rand"
 	"time"
 )

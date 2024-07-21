@@ -8,7 +8,7 @@ import (
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abewallet/walletdb"
+	"github.com/abesuite/abewalletmlp/walletdb"
 	"github.com/bits-and-blooms/bitset"
 	"time"
 )

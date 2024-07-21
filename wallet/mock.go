@@ -3,8 +3,8 @@ package wallet
 import (
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewallet/chain"
-	"github.com/abesuite/abewallet/waddrmgr"
+	"github.com/abesuite/abewalletmlp/chain"
+	"github.com/abesuite/abewalletmlp/waddrmgr"
 	"time"
 )
 

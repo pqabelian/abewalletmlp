@@ -2,9 +2,9 @@ package wallet
 
 import (
 	"github.com/abesuite/abec/abelog"
-	"github.com/abesuite/abewallet/waddrmgr"
-	"github.com/abesuite/abewallet/walletdb/migration"
-	"github.com/abesuite/abewallet/wtxmgr"
+	"github.com/abesuite/abewalletmlp/waddrmgr"
+	"github.com/abesuite/abewalletmlp/walletdb/migration"
+	"github.com/abesuite/abewalletmlp/wtxmgr"
 )
 
 // log is a logger that is initialized with no output filters.  This

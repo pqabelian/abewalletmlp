@@ -23,9 +23,9 @@ import (
 	"github.com/abesuite/abec/rpcclient"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewallet/chain"
-	"github.com/abesuite/abewallet/waddrmgr"
-	"github.com/abesuite/abewallet/wallet"
+	"github.com/abesuite/abewalletmlp/chain"
+	"github.com/abesuite/abewalletmlp/waddrmgr"
+	"github.com/abesuite/abewalletmlp/wallet"
 )
 
 // confirmed checks whether a transaction at height txHeight has met minconf

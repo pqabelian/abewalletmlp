@@ -2,7 +2,7 @@ package waddrmgr
 
 import (
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abewallet/walletdb"
+	"github.com/abesuite/abewalletmlp/walletdb"
 	"time"
 )
 

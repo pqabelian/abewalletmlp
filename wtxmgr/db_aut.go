@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewallet/walletdb"
+	"github.com/abesuite/abewalletmlp/walletdb"
 )
 
 // block height || block hash -> version + []UnspentTXO 【txhash + index + amount + generationTime + ringhash】

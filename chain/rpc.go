@@ -8,8 +8,8 @@ import (
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/rpcclient"
-	"github.com/abesuite/abewallet/waddrmgr"
-	"github.com/abesuite/abewallet/wtxmgr"
+	"github.com/abesuite/abewalletmlp/waddrmgr"
+	"github.com/abesuite/abewalletmlp/wtxmgr"
 )
 
 // RPCClient represents a persistent client connection to an abelian RPC server
@@ -190,7 +190,7 @@ func (c *RPCClient) BlockStamp() (*waddrmgr.BlockStamp, error) {
 // block containing a matching address. If no matches are found in the range of
 // blocks requested, the returned response will be nil.
 
-//	todo(ABE):
+// todo(ABE):
 func (c *RPCClient) onClientConnect() {
 	select {
 	case c.enqueueNotification <- ClientConnected{}:
@@ -227,6 +227,7 @@ func (c *RPCClient) onBlockDisconnected(hash *chainhash.Hash, height int32, time
 }
 
 //	todo(ABE): the notification handlers such as OnBlockConnected send messages to c.enqueueNotification and trigger this handler
+//
 // handler maintains a queue of notifications and the current state (best
 // block) of the chain.
 func (c *RPCClient) handler() {

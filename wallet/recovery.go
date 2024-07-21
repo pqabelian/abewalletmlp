@@ -5,7 +5,7 @@ import (
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewallet/wtxmgr"
+	"github.com/abesuite/abewalletmlp/wtxmgr"
 	"time"
 )
 

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/abesuite/abewallet/wordlists"
+	"github.com/abesuite/abewalletmlp/wordlists"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,10 +16,10 @@ import (
 
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewallet/internal/prompt"
-	"github.com/abesuite/abewallet/wallet"
-	"github.com/abesuite/abewallet/walletdb"
-	_ "github.com/abesuite/abewallet/walletdb/bdb"
+	"github.com/abesuite/abewalletmlp/internal/prompt"
+	"github.com/abesuite/abewalletmlp/wallet"
+	"github.com/abesuite/abewalletmlp/walletdb"
+	_ "github.com/abesuite/abewalletmlp/walletdb/bdb"
 )
 
 // networkDir returns the directory name of a network directory to hold wallet

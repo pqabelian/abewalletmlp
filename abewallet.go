@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/abesuite/abewallet/chain"
-	"github.com/abesuite/abewallet/rpc/legacyrpc"
-	"github.com/abesuite/abewallet/wallet"
+	"github.com/abesuite/abewalletmlp/chain"
+	"github.com/abesuite/abewalletmlp/rpc/legacyrpc"
+	"github.com/abesuite/abewalletmlp/wallet"
 	"io/ioutil"
 	"net"
 	"net/http"

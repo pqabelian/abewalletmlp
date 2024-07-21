@@ -9,8 +9,8 @@ import (
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abewallet/waddrmgr"
-	"github.com/abesuite/abewallet/walletdb"
+	"github.com/abesuite/abewalletmlp/waddrmgr"
+	"github.com/abesuite/abewalletmlp/walletdb"
 	"math"
 	"time"
 
