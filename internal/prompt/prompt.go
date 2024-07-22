@@ -10,7 +10,7 @@ import (
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil/hdkeychain"
-	"github.com/abesuite/abewallet/wordlists"
+	"github.com/abesuite/abewalletmlp/wordlists"
 	"golang.org/x/crypto/ssh/terminal"
 	"os"
 	"strconv"

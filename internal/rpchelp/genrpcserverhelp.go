@@ -7,7 +7,7 @@ package main
 import (
 	"fmt"
 	"github.com/abesuite/abec/abejson"
-	"github.com/abesuite/abewallet/internal/rpchelp"
+	"github.com/abesuite/abewalletmlp/internal/rpchelp"
 	"log"
 	"os"
 	"strings"

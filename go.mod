@@ -11,9 +11,9 @@ require (
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jrick/logrotate v1.0.0
 	github.com/lightningnetwork/lnd/clock v1.0.1
-	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
+	github.com/tyler-smith/go-bip39 v1.1.0
 	go.etcd.io/bbolt v1.3.5
-	golang.org/x/crypto v0.1.0
-	golang.org/x/net v0.1.0
+	golang.org/x/crypto v0.23.0
+	golang.org/x/net v0.21.0
 	google.golang.org/grpc v1.30.0
 )

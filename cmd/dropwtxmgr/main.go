@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abewallet/waddrmgr"
-	"github.com/abesuite/abewallet/walletdb"
-	"github.com/abesuite/abewallet/wtxmgr"
+	"github.com/abesuite/abewalletmlp/waddrmgr"
+	"github.com/abesuite/abewalletmlp/walletdb"
+	"github.com/abesuite/abewalletmlp/wtxmgr"
 	"os"
 	"path/filepath"
 

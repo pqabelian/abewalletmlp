@@ -11,7 +11,7 @@ import (
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
-	"github.com/abesuite/abewallet/wallet/txrules"
+	"github.com/abesuite/abewalletmlp/wallet/txrules"
 	"sort"
 	"strings"
 	"sync"
