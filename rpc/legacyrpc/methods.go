@@ -1588,6 +1588,10 @@ func generateAddressAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 	cmd := icmd.(*abejson.GenerateAddressCmd)
 	number := *cmd.Num
 
+	if w.Manager.IsLocked() {
+		return nil, errors.New("wallet is locked")
+	}
+
 	var err error
 	numberOrder := make([]uint64, number)
 	addresses := make([][]byte, number)
