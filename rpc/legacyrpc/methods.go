@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
+	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
@@ -1403,8 +1404,11 @@ func sendAddressAbe(w *wallet.Wallet, amounts []abejson.Pair,
 		}
 	}
 	txHashStr := tx.Tx.TxHash().String()
-	log.Infof("Successfully sent transaction %v", txHashStr)
-	return txHashStr + fmt.Sprintf("\nCurrent max No. of address is %d", tx.ChangeAddressNo), nil
+	res := txHashStr
+	if w.Manager.GetCryptoScheme() == abecryptoxparam.CryptoSchemePQRingCT {
+		res = txHashStr + fmt.Sprintf("\nCurrent max No. of address is %d", tx.ChangeAddressNo)
+	}
+	return res, nil
 }
 
 func sendAddressAbeAUT(w *wallet.Wallet, autTransaction aut.Transaction, amounts []abejson.Pair,
