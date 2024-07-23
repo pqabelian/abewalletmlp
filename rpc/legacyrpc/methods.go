@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
+	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
@@ -950,6 +951,10 @@ func listSpentAndMinedAbe(icmd interface{}, w *wallet.Wallet) (interface{}, erro
 func listAUTCoins(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.ListAUTCoinsCmd)
 
+	if w.Manager.GetPrivacyLevel() != abecryptoxkey.PrivacyLevelPSEUDONYM {
+		return nil, fmt.Errorf("currently ONLY pseudonym-address abewalletmlp support AUT")
+	}
+
 	rootCoinOnly := cmd.RootCoinOnly != nil && *cmd.RootCoinOnly
 	autIdentifier := ""
 	if cmd.AUTIdentifier != nil {
@@ -1693,6 +1698,9 @@ func sendToAddressesAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 func registerAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.RegisterAUTTransactionCmd)
 	// according command to  build the output
+	if w.Manager.GetPrivacyLevel() != abecryptoxkey.PrivacyLevelPSEUDONYM {
+		return nil, fmt.Errorf("currently ONLY pseudonym-address abewalletmlp support AUT")
+	}
 
 	if len(cmd.AUTIdentifier) != aut.IdentifierLength {
 		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d", aut.IdentifierLength, len(cmd.AUTIdentifier))
@@ -1765,6 +1773,10 @@ func registerAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, er
 func mintAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.MintAUTTransactionCmd)
 	// according command to  build the output
+	if w.Manager.GetPrivacyLevel() != abecryptoxkey.PrivacyLevelPSEUDONYM {
+		return nil, fmt.Errorf("currently ONLY pseudonym-address abewalletmlp support AUT")
+	}
+
 	if len(cmd.AUTIdentifier) != aut.IdentifierLength {
 		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d", aut.IdentifierLength, len(cmd.AUTIdentifier))
 	}
@@ -1792,6 +1804,10 @@ func mintAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 func transferAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.TransferAUTTransactionCmd)
 	// according command to  build the output
+	if w.Manager.GetPrivacyLevel() != abecryptoxkey.PrivacyLevelPSEUDONYM {
+		return nil, fmt.Errorf("currently ONLY pseudonym-address abewalletmlp support AUT")
+	}
+
 	if len(cmd.AUTIdentifier) != aut.IdentifierLength {
 		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d", aut.IdentifierLength, len(cmd.AUTIdentifier))
 	}
@@ -1822,6 +1838,10 @@ func transferAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 func reRegisterAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.ReRegisterAUTTransactionCmd)
 	// according command to  build the output
+	if w.Manager.GetPrivacyLevel() != abecryptoxkey.PrivacyLevelPSEUDONYM {
+		return nil, fmt.Errorf("currently ONLY pseudonym-address abewalletmlp support AUT")
+	}
+
 	if len(cmd.AUTIdentifier) != aut.IdentifierLength {
 		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d", aut.IdentifierLength, len(cmd.AUTIdentifier))
 	}
@@ -1883,6 +1903,9 @@ func reRegisterAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, 
 
 func burnAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.BurnAUTTransactionCmd)
+	if w.Manager.GetPrivacyLevel() != abecryptoxkey.PrivacyLevelPSEUDONYM {
+		return nil, fmt.Errorf("currently ONLY pseudonym-address abewalletmlp support AUT")
+	}
 
 	utxosSpecified := strings.Split(cmd.UTXOSpescified, ",")
 	if len(utxosSpecified) == 0 {
