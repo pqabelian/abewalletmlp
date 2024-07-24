@@ -1445,7 +1445,11 @@ func sendAddressAbeAUT(w *wallet.Wallet, autTransaction aut.Transaction, amounts
 	}
 	txHashStr := tx.Tx.TxHash().String()
 	log.Infof("Successfully sent transaction %v", txHashStr)
-	return txHashStr + fmt.Sprintf("\nCurrent max No. of address is %d", tx.ChangeAddressNo), nil
+	res := txHashStr
+	if w.Manager.GetCryptoScheme() == abecryptoxparam.CryptoSchemePQRingCT {
+		res = txHashStr + fmt.Sprintf("\nCurrent max No. of address is %d", tx.ChangeAddressNo)
+	}
+	return res, nil
 }
 
 func sendPairsAbe(w *wallet.Wallet, amounts map[string]abeutil.Amount,
@@ -1558,6 +1562,10 @@ func sendToPayees(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 
 func addressMaxSequenceNumber(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	_ = icmd.(*abejson.AddressMaxSequenceNumberCmd)
+	if w.Manager.GetCryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
+		return nil, errors.New("current wallet do not use the concept of sequence number")
+	}
+
 	addressMaxSN, err := w.AddressMaxSequenceNumber()
 	if err != nil {
 		return -1, err
@@ -1567,6 +1575,9 @@ func addressMaxSequenceNumber(icmd interface{}, w *wallet.Wallet) (interface{}, 
 
 func addressRange(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.AddressRangeCmd)
+	if w.Manager.GetCryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
+		return nil, errors.New("current wallet can not export address because it do not use the concept of sequence number")
+	}
 	res, err := w.AddressRange(cmd.Start, cmd.End)
 	if err != nil {
 		return nil, err
@@ -1577,6 +1588,9 @@ func addressRange(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 // The result would be a hex.EncodeToString([]byte) to a string
 func exportAddressKeyRandSeed(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.ExportRangeCmd)
+	if w.Manager.GetCryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
+		return nil, errors.New("current wallet can not export any seed because it do not use the concept of sequence number")
+	}
 	res, err := w.ExportAddressKeyRandSeed(cmd.Start, cmd.End)
 	if err != nil {
 		return nil, err
@@ -1626,6 +1640,9 @@ func generateAddressAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 }
 func listFreeAddress(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	_ = icmd.(*abejson.ListFreeAddressesCmd)
+	if w.Manager.GetCryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
+		return nil, errors.New("current wallet do not use the concept of free address")
+	}
 
 	addressBytes, err := w.ListFreeAddresses()
 	if err != nil {
