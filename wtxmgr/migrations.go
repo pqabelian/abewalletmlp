@@ -12,7 +12,7 @@ import (
 // it up.
 var versions = []migration.Version{
 	{
-		Number:    2,
+		Number:    0,
 		Migration: nil,
 	},
 }

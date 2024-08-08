@@ -3,7 +3,6 @@ package rpcserver
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"sync"
 	"time"
@@ -686,8 +685,8 @@ func (s *loaderServer) CreateWalletAbe(ctx context.Context, req *pb.CreateWallet
 	}
 
 	createdWallet, err := s.loader.CreateNewWallet(
-		abecryptoxparam.CryptoSchemePQRingCTX, abecryptoxkey.PrivacyLevelRINGCT,
-		pubPassphrase, req.PrivatePassphrase, req.Seed, 0, time.Now(), true)
+		abecryptoxparam.CryptoSchemePQRingCTX,
+		pubPassphrase, req.PrivatePassphrase, req.Seed, time.Now(), true)
 	if err != nil {
 		return nil, translateError(err)
 	}

@@ -1,15 +1,12 @@
 package waddrmgr
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abewalletmlp/walletdb"
-	"github.com/bits-and-blooms/bitset"
 	"time"
 )
 
@@ -226,25 +223,26 @@ var (
 	// crypto keys that encrypt all other generated keys, the watch only
 	// flag, the master private key (encrypted), the master HD private key
 	// (encrypted), and also versioning information.
-	mainBucketName     = []byte("main")
-	addrIdxBucketName  = []byte("addridx")  // idx -> addr key
-	idxAddrBucketName  = []byte("idxaddr")  // addr key-> idx
-	addrBukcetName     = []byte("address")  // instance address = coin address + value address
-	askspBukcetName    = []byte("asksp")    // coin spend key
-	asksnBukcetName    = []byte("asksn")    // coin serial number key
-	detectorBukcetName = []byte("detector") // coin serial number key
-	vskBukcetName      = []byte("valuesk")  // value secret key
+	mainBucketName = []byte("main")
+
+	addrIdxBucketName = []byte("addridx") // public rand -> addr key
+	idxAddrBucketName = []byte("idxaddr") // addr key-> public rand
+
+	addrBucketName     = []byte("address")  // instance address = coin address + value address
+	askspBucketName    = []byte("asksp")    // coin spend key
+	asksnBucketName    = []byte("asksn")    // coin serial number key
+	vskBucketName      = []byte("valuesk")  // value secret key
+	detectorBucketName = []byte("detector") // detector key
+
 	// masterHDPrivName is the name of the key that stores the master HD
 	// private key. This key is encrypted with the master private crypto
 	// encryption key. This resides under the main bucket.
 	//masterHDPrivName = []byte("mhdpriv")
 
-	// derived seed and its used status
-	seedKeyName    = []byte("seed")
-	seedStatusName = []byte("sdcnt")
-	addrStatusName = []byte("addrstatus") // bitmap
-	netIDName      = []byte("netid")
+	netIDName = []byte("netid")
 
+	//  spend root seed
+	seedKeyName = []byte("seed") // spend seed
 	// sn root seed
 	snKeyRootSeedKeyName = []byte("snseed")
 	// value root seed
@@ -278,7 +276,7 @@ var (
 	cryptoScriptKeyName = []byte("cscript") // useless temporary
 	watchingOnlyName    = []byte("watchonly")
 	cryptoSchemeName    = []byte("cryptoscheme")
-	privacyLevelName    = []byte("privacylevel")
+	//privacyLevelName    = []byte("privacylevel")
 
 	// Sync related key names (sync bucket).
 	syncedToName              = []byte("syncedto")
@@ -432,217 +430,33 @@ func putMasterKeyParams(ns walletdb.ReadWriteBucket, pubParams, privParams []byt
 // bucket. These are required in order to create any new manager scopes, as
 // those are created via hardened derivation of the children of this key.
 
-func fetchAddressKeys(ns walletdb.ReadBucket, start uint64, end uint64) (addrKeys map[uint64][]byte, err error) {
-	addrKeys = make(map[uint64][]byte, end-start)
-	mainBucket := ns.NestedReadBucket(mainBucketName)
-	addrIdxBucket := mainBucket.NestedReadBucket(addrIdxBucketName)
-	for i := start; i < end; i++ {
-		addrKeys[i] = addrIdxBucket.Get(uint64ToBytes(i))
-	}
-	return addrKeys, nil
-}
-
-func fetchSeedStatus(ns walletdb.ReadBucket) (uint64, error) {
+// putAddressKeysEnc TODO 20220610: check the internal logic of function
+func putAddressKeysEnc(ns walletdb.ReadWriteBucket, addrKey []byte,
+	addressSecretKeySpEnc, addressSecretKeySnEnc, addressEnc []byte,
+	valueSecretKeyEnc, detectorKeyEnc []byte, publicRand []byte) error {
 	// As this is the key for the root manager, we don't need to fetch any
 	// particular scope, and can insert directly within the main bucket.
-	bucket := ns.NestedReadBucket(mainBucketName)
-	status := bucket.Get(seedStatusName)
-	if status == nil {
-		str := "failed to fetch seed status"
-		return 0, managerError(ErrDatabase, str, errors.New("the status of seed is wrong"))
-	}
-	cnt := binary.LittleEndian.Uint64(status)
-	return cnt, nil
-}
-func putSeedStatus(ns walletdb.ReadWriteBucket, cnt uint64) error {
-	// As this is the key for the root manager, we don't need to fetch any
-	// particular scope, and can insert directly within the main bucket.
-	bucket := ns.NestedReadWriteBucket(mainBucketName)
-	status := make([]byte, 8)
-	binary.LittleEndian.PutUint64(status, cnt)
-	err := bucket.Put(seedStatusName, status)
-	if err != nil {
-		str := "failed to store seed status"
-		return managerError(ErrDatabase, str, err)
-	}
-	return nil
-}
-
-func markAddrUnused(ns walletdb.ReadWriteBucket, cnt uint64) error {
 	mainBucket := ns.NestedReadWriteBucket(mainBucketName)
-	bitmapBuff := bytes.NewBuffer(mainBucket.Get(addrStatusName))
-	set := bitset.BitSet{}
-	set.ReadFrom(bitmapBuff)
-	set.Clear(uint(cnt))
-	outputBuff := &bytes.Buffer{}
-	set.WriteTo(outputBuff)
-	err := mainBucket.Put(addrStatusName, outputBuff.Bytes())
-	if err != nil {
-		str := "failed to store seed status"
-		return managerError(ErrDatabase, str, err)
-	}
-	return nil
-}
 
-func markAddrUsed(ns walletdb.ReadWriteBucket, cnt uint64) error {
-	mainBucket := ns.NestedReadWriteBucket(mainBucketName)
-	bitmapBuff := bytes.NewBuffer(mainBucket.Get(addrStatusName))
-	set := bitset.BitSet{}
-	set.ReadFrom(bitmapBuff)
-	set.Set(uint(cnt))
-	outputBuff := &bytes.Buffer{}
-	set.WriteTo(outputBuff)
-	err := mainBucket.Put(addrStatusName, outputBuff.Bytes())
-	if err != nil {
-		str := "failed to store seed status"
-		return managerError(ErrDatabase, str, err)
-	}
-	return nil
-}
-
-func checkFreeAddress(ns walletdb.ReadBucket) error {
-	mainBucket := ns.NestedReadBucket(mainBucketName)
-	bitmapBytes := mainBucket.Get(addrStatusName)
-	bitmapBuff := bytes.NewBuffer(bitmapBytes)
-	set := bitset.BitSet{}
-	set.ReadFrom(bitmapBuff)
-	// read seed status
-	status := mainBucket.Get(seedStatusName)
-	if status == nil {
-		str := "failed to fetch seed status"
-		return managerError(ErrDatabase, str, errors.New("the status of seed is wrong"))
-	}
-	latestCnt := binary.LittleEndian.Uint64(status)
-	// probe 20 addresses backwards
-	lastUsed, ok := set.NextSet(uint(latestCnt))
-	if ok && uint64(lastUsed) >= latestCnt {
-		log.Warnf("The lastest addresses are marked used, if it is the first synchronization, " +
-			"the maximum address sequence number may not be large enough, please increase it " +
-			"as appropriate")
-	}
-
-	return nil
-}
-
-func fetchNextFreeAddressKey(ns walletdb.ReadBucket) (uint64, []byte, error) {
-	mainBucket := ns.NestedReadBucket(mainBucketName)
-	bitmapBytes := mainBucket.Get(addrStatusName)
-	bitmapBuff := bytes.NewBuffer(bitmapBytes)
-	set := bitset.BitSet{}
-	set.ReadFrom(bitmapBuff)
-
-	// read seed status
-	status := mainBucket.Get(seedStatusName)
-	if status == nil {
-		str := "failed to fetch seed status"
-		return 0, nil, managerError(ErrDatabase, str, errors.New("the status of seed is wrong"))
-	}
-	latestCnt := binary.LittleEndian.Uint64(status)
-
-	// flip set
-	flippedSet := set.Clone()
-	flippedSet.FlipRange(0, uint(latestCnt))
-
-	// intersection
-	allSet := bitset.BitSet{}
-	for i := uint64(0); i <= latestCnt; i++ {
-		allSet.Set(uint(i))
-	}
-	result := flippedSet.Intersection(&allSet)
-
-	addrIdxBucket := mainBucket.NestedReadBucket(addrIdxBucketName)
-	current := uint64(0)
-	for current <= latestCnt {
-		if k, ok := result.NextSet(uint(current)); ok {
-			return uint64(k), addrIdxBucket.Get(uint64ToBytes(uint64(k))), nil
-		}
-		current += 1
-	}
-
-	return 0, nil, nil
-}
-
-func fetchFreeAddressKeys(ns walletdb.ReadBucket) (map[uint64][]byte, error) {
-	mainBucket := ns.NestedReadBucket(mainBucketName)
-	bitmapBytes := mainBucket.Get(addrStatusName)
-	bitmapBuff := bytes.NewBuffer(bitmapBytes)
-	set := bitset.BitSet{}
-	set.ReadFrom(bitmapBuff)
-
-	// read seed status
-	status := mainBucket.Get(seedStatusName)
-	if status == nil {
-		str := "failed to fetch seed status"
-		return nil, managerError(ErrDatabase, str, errors.New("the status of seed is wrong"))
-	}
-	latestCnt := binary.LittleEndian.Uint64(status)
-
-	// flip set
-	flippedSet := set.Clone()
-	flippedSet.FlipRange(0, 500)
-
-	// intersection
-	allSet := bitset.BitSet{}
-	for i := uint64(0); i < latestCnt; i++ {
-		allSet.Set(uint(i))
-	}
-	result := flippedSet.Intersection(&allSet)
-
-	addrIdxBucket := mainBucket.NestedReadBucket(addrIdxBucketName)
-	current := uint64(0)
-	res := map[uint64][]byte{}
-	for current <= latestCnt {
-		if k, ok := result.NextSet(uint(current)); ok {
-			res[uint64(k)] = addrIdxBucket.Get(uint64ToBytes(uint64(k)))
-			current = uint64(k) + 1
-		} else {
-			current++
-		}
-	}
-
-	return res, nil
-}
-
-func putAddressKeyIndex(mainBucket walletdb.ReadWriteBucket, addrKey []byte, idxByte []byte) error {
+	// addr key -> public rand
 	addressIndexBucket := mainBucket.NestedReadWriteBucket(addrIdxBucketName)
-	err := addressIndexBucket.Put(idxByte, addrKey)
+	err := addressIndexBucket.Put(publicRand, addrKey)
 	if err != nil {
 		str := "failed to store address index"
 		return managerError(ErrDatabase, str, err)
 	}
 
+	// public rand -> addr key
 	idxAddressBucket := mainBucket.NestedReadWriteBucket(idxAddrBucketName)
-	err = idxAddressBucket.Put(addrKey, idxByte)
+	err = idxAddressBucket.Put(addrKey, publicRand)
 	if err != nil {
 		str := "failed to store index address"
 		return managerError(ErrDatabase, str, err)
 	}
-	return nil
-}
 
-// putAddressKeysEnc TODO 20220610: check the internal logic of function
-func putAddressKeysEnc(ns walletdb.ReadWriteBucket, idx uint64, addrKey []byte, valueSecretKeyEnc,
-	addressSecretKeySpEnc, addressSecretKeySnEnc, addressKeyEnc []byte, detectorKeyEnc []byte, publicRand []byte) error {
-	// As this is the key for the root manager, we don't need to fetch any
-	// particular scope, and can insert directly within the main bucket.
-	mainBucket := ns.NestedReadWriteBucket(mainBucketName)
-
-	// use this feature to distinguish the old crypto scheme and new ones
-	if len(publicRand) == 0 {
-		err := putAddressKeyIndex(mainBucket, addrKey, uint64ToBytes(idx))
-		if err != nil {
-			return err
-		}
-	} else {
-		err := putAddressKeyIndex(mainBucket, addrKey, publicRand)
-		if err != nil {
-			return err
-		}
-	}
-
-	if addressKeyEnc != nil {
-		addrBucket := mainBucket.NestedReadWriteBucket(addrBukcetName)
-		err := addrBucket.Put(addrKey, addressKeyEnc)
+	if addressEnc != nil {
+		addrBucket := mainBucket.NestedReadWriteBucket(addrBucketName)
+		err := addrBucket.Put(addrKey, addressEnc)
 		if err != nil {
 			str := "failed to store encrypted master public key"
 			return managerError(ErrDatabase, str, err)
@@ -652,17 +466,9 @@ func putAddressKeysEnc(ns walletdb.ReadWriteBucket, idx uint64, addrKey []byte, 
 	// Now that we have the main bucket, we can directly store each of the
 	// relevant keys. If we're in watch only mode, then some or all of
 	// these keys might not be available.
-	if valueSecretKeyEnc != nil {
-		vskBukcet := mainBucket.NestedReadWriteBucket(vskBukcetName)
-		err := vskBukcet.Put(addrKey, valueSecretKeyEnc)
-		if err != nil {
-			str := "failed to store encrypted master private signing key"
-			return managerError(ErrDatabase, str, err)
-		}
-	}
 
 	if addressSecretKeySpEnc != nil {
-		askspBukcet := mainBucket.NestedReadWriteBucket(askspBukcetName)
+		askspBukcet := mainBucket.NestedReadWriteBucket(askspBucketName)
 		err := askspBukcet.Put(addrKey, addressSecretKeySpEnc)
 		if err != nil {
 			str := "failed to store encrypted master private signing key"
@@ -671,7 +477,7 @@ func putAddressKeysEnc(ns walletdb.ReadWriteBucket, idx uint64, addrKey []byte, 
 	}
 
 	if addressSecretKeySnEnc != nil {
-		asksnBukcet := mainBucket.NestedReadWriteBucket(asksnBukcetName)
+		asksnBukcet := mainBucket.NestedReadWriteBucket(asksnBucketName)
 		err := asksnBukcet.Put(addrKey, addressSecretKeySnEnc)
 		if err != nil {
 			str := "failed to store encrypted master public key"
@@ -679,8 +485,17 @@ func putAddressKeysEnc(ns walletdb.ReadWriteBucket, idx uint64, addrKey []byte, 
 		}
 	}
 
+	if valueSecretKeyEnc != nil {
+		vskBukcet := mainBucket.NestedReadWriteBucket(vskBucketName)
+		err := vskBukcet.Put(addrKey, valueSecretKeyEnc)
+		if err != nil {
+			str := "failed to store encrypted master private signing key"
+			return managerError(ErrDatabase, str, err)
+		}
+	}
+
 	if detectorKeyEnc != nil {
-		detectorKeyBukcet := mainBucket.NestedReadWriteBucket(detectorBukcetName)
+		detectorKeyBukcet := mainBucket.NestedReadWriteBucket(detectorBucketName)
 		if detectorKeyBukcet != nil {
 			err := detectorKeyBukcet.Put(addrKey, detectorKeyEnc)
 			if err != nil {
@@ -692,29 +507,48 @@ func putAddressKeysEnc(ns walletdb.ReadWriteBucket, idx uint64, addrKey []byte, 
 
 	return nil
 }
-func fetchAddressKeyEnc(ns walletdb.ReadBucket, addrKey []byte) ([]byte, []byte, []byte, []byte, uint64, []byte, error) {
+
+func fetchAddressKeyEncByPublicRand(ns walletdb.ReadBucket, publicRand []byte) ([]byte, []byte, []byte, []byte, []byte, []byte, error) {
 	mainBucket := ns.NestedReadBucket(mainBucketName)
 
-	addrBucket := mainBucket.NestedReadBucket(addrBukcetName)
+	idxAddrBucket := mainBucket.NestedReadBucket(idxAddrBucketName)
+	addrKey := idxAddrBucket.Get(publicRand)
+
+	addrBucket := mainBucket.NestedReadBucket(addrBucketName)
 	addrEnc := addrBucket.Get(addrKey)
-	vskBukcet := mainBucket.NestedReadBucket(vskBukcetName)
+
+	askspBucket := mainBucket.NestedReadBucket(askspBucketName)
+	askspEnc := askspBucket.Get(addrKey)
+	asksnBucket := mainBucket.NestedReadBucket(asksnBucketName)
+	asksnEnc := asksnBucket.Get(addrKey)
+	vskBukcet := mainBucket.NestedReadBucket(vskBucketName)
 	vskEnc := vskBukcet.Get(addrKey)
 
-	askspBucket := mainBucket.NestedReadBucket(askspBukcetName)
+	detectorKeyBucket := mainBucket.NestedReadBucket(detectorBucketName)
+	detectorKeyEnc := detectorKeyBucket.Get(addrKey)
+
+	return addrEnc, askspEnc, asksnEnc, vskEnc, detectorKeyEnc, addrKey, nil
+}
+func fetchAddressKeyEncByAddrKey(ns walletdb.ReadBucket, addrKey []byte) ([]byte, []byte, []byte, []byte, []byte, []byte, error) {
+	mainBucket := ns.NestedReadBucket(mainBucketName)
+
+	addrBucket := mainBucket.NestedReadBucket(addrBucketName)
+	addrEnc := addrBucket.Get(addrKey)
+
+	askspBucket := mainBucket.NestedReadBucket(askspBucketName)
 	askspEnc := askspBucket.Get(addrKey)
-	asksnBucket := mainBucket.NestedReadBucket(asksnBukcetName)
+	asksnBucket := mainBucket.NestedReadBucket(asksnBucketName)
 	asksnEnc := asksnBucket.Get(addrKey)
-	var detecorKeyEnc []byte
-	if detectorKeyBucket := mainBucket.NestedReadBucket(detectorBukcetName); detectorKeyBucket != nil {
-		detecorKeyEnc = detectorKeyBucket.Get(addrKey)
-	}
+	vskBukcet := mainBucket.NestedReadBucket(vskBucketName)
+	vskEnc := vskBukcet.Get(addrKey)
+
+	detectorKeyBucket := mainBucket.NestedReadBucket(detectorBucketName)
+	detectorKeyEnc := detectorKeyBucket.Get(addrKey)
 
 	idxAddrBucket := mainBucket.NestedReadBucket(idxAddrBucketName)
-	addrIdx := uint64(0)
-	if idxBytes := idxAddrBucket.Get(addrKey); len(idxBytes) != 0 {
-		addrIdx = binary.LittleEndian.Uint64(idxBytes)
-	}
-	return addrEnc, askspEnc, asksnEnc, vskEnc, addrIdx, detecorKeyEnc, nil
+	publicRand := idxAddrBucket.Get(addrKey)
+
+	return addrEnc, askspEnc, asksnEnc, vskEnc, detectorKeyEnc, publicRand, nil
 }
 
 // fetchMasterHDKeys attempts to fetch both the master HD private and public
@@ -778,7 +612,7 @@ func fetchNetID(ns walletdb.ReadBucket) ([]byte, error) {
 	bucket := ns.NestedReadBucket(mainBucketName)
 	return bucket.Get(netIDName), nil
 }
-func fetchSeedEnc(ns walletdb.ReadBucket) ([]byte, error) {
+func fetchSpKeyRootSeedEnc(ns walletdb.ReadBucket) ([]byte, error) {
 	bucket := ns.NestedReadBucket(mainBucketName)
 	var seedEnc []byte
 
@@ -961,30 +795,6 @@ func fetchCryptoScheme(ns walletdb.ReadBucket) (abecryptoxparam.CryptoScheme, er
 	}
 
 	return abecryptoxparam.CryptoScheme(buf[0]), nil
-}
-
-// putPrivacyLevel stores the weaker-privacy flag to the database.
-func putPrivacyLevel(ns walletdb.ReadWriteBucket, privacyLevel abecryptoxkey.PrivacyLevel) error {
-	bucket := ns.NestedReadWriteBucket(mainBucketName)
-
-	if err := bucket.Put(privacyLevelName, []byte{byte(privacyLevel)}); err != nil {
-		str := "failed to store privacy flag"
-		return managerError(ErrDatabase, str, err)
-	}
-	return nil
-}
-
-// fetchPrivacyLevel loads the privacy level from the database.
-func fetchPrivacyLevel(ns walletdb.ReadBucket) (abecryptoxkey.PrivacyLevel, error) {
-	bucket := ns.NestedReadBucket(mainBucketName)
-
-	buf := bucket.Get(privacyLevelName)
-	if len(buf) != 1 {
-		str := "malformed privacy flag stored in database"
-		return 0, managerError(ErrDatabase, str, nil)
-	}
-
-	return abecryptoxkey.PrivacyLevel(buf[0]), nil
 }
 
 // deserializeAccountRow deserializes the passed serialized account information.
@@ -1512,7 +1322,7 @@ func createManagerNS(ns walletdb.ReadWriteBucket) error {
 		return managerError(ErrDatabase, str, err)
 	}
 
-	_, err = mainBucket.CreateBucket(addrBukcetName)
+	_, err = mainBucket.CreateBucket(addrBucketName)
 	if err != nil {
 		str := "failed to create address bucket"
 		return managerError(ErrDatabase, str, err)
@@ -1527,22 +1337,22 @@ func createManagerNS(ns walletdb.ReadWriteBucket) error {
 		str := "failed to create index address bucket"
 		return managerError(ErrDatabase, str, err)
 	}
-	_, err = mainBucket.CreateBucket(askspBukcetName)
+	_, err = mainBucket.CreateBucket(askspBucketName)
 	if err != nil {
 		str := "failed to create asksp bucket"
 		return managerError(ErrDatabase, str, err)
 	}
-	_, err = mainBucket.CreateBucket(asksnBukcetName)
+	_, err = mainBucket.CreateBucket(asksnBucketName)
 	if err != nil {
 		str := "failed to create asksn bucket"
 		return managerError(ErrDatabase, str, err)
 	}
-	_, err = mainBucket.CreateBucket(vskBukcetName)
+	_, err = mainBucket.CreateBucket(vskBucketName)
 	if err != nil {
 		str := "failed to create valuesk bucket"
 		return managerError(ErrDatabase, str, err)
 	}
-	_, err = mainBucket.CreateBucket(detectorBukcetName)
+	_, err = mainBucket.CreateBucket(detectorBucketName)
 	if err != nil {
 		str := "failed to create detector bucket"
 		return managerError(ErrDatabase, str, err)

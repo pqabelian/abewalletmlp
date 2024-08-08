@@ -2,55 +2,12 @@ package wtxmgr
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abewalletmlp/walletdb"
+	"reflect"
 )
-
-// block height || block hash -> version + []UnspentTXO 【txhash + index + amount + generationTime + ringhash】
-func valueAUTCoin(coin *AUTCoin) []byte {
-	res := make([]byte, chainhash.HashSize+1+4+len(coin.AUTIdentifier)+1+8+4+len(coin.AddrKey)+1)
-
-	offset := 0
-	copy(res[offset:], coin.TxOutput.TxHash[:])
-	offset += chainhash.HashSize
-	res[offset] = coin.TxOutput.Index
-	offset += 1
-
-	byteOrder.PutUint32(res[offset:], uint32(len(coin.AUTIdentifier)))
-	offset += 4
-	copy(res[offset:], coin.AUTIdentifier)
-	offset += len(coin.AUTIdentifier)
-
-	//_ = coin.IsAUTRootCoin //  byte 1
-	if coin.IsAUTRootCoin {
-		res[offset] = 1
-	} else {
-		res[offset] = 0
-	}
-	offset += 1
-
-	//_ = coin.AUTCoinValue  //   8
-	byteOrder.PutUint64(res[offset:], coin.AUTCoinValue)
-	offset += 8
-
-	byteOrder.PutUint32(res[offset:], uint32(len(coin.AddrKey)))
-	offset += 4
-	copy(res[offset:], coin.AddrKey)
-	offset += len(coin.AddrKey)
-
-	//_ = coin.Spent         //   byte 1
-	if coin.Spent {
-		res[offset] = 1
-	} else {
-		res[offset] = 0
-	}
-	offset += 1
-
-	return res
-}
 
 func fetchAUTRootCoinNum(ns walletdb.ReadBucket) (map[string]uint64, error) {
 	res := map[string]uint64{}
@@ -258,17 +215,32 @@ func putAUTUnconfirmedBalance(ns walletdb.ReadWriteBucket, amts map[string]uint6
 	return nil
 }
 
-func putRawAUTCoin(ns walletdb.ReadWriteBucket, k, v []byte) error {
+func putRawAUTCoin(ns walletdb.ReadWriteBucket, txHash chainhash.Hash, index uint8, coin *AUTCoin) error {
+	k := canonicalOutPointAbe(txHash, index)
+	v, err := coin.Serialized()
+	if err != nil {
+		return err
+	}
+
 	autPointBucket := ns.NestedReadWriteBucket(bucketAUTPoint)
-	err := autPointBucket.Put(k, v)
+	err = autPointBucket.Put(k, v)
 	if err != nil {
 		str := "failed to put aut entry"
 		return storeError(ErrDatabase, str, err)
 	}
+
+	autCoin, err := fetchRawAUTCoin(ns, txHash, index)
+	if err != nil {
+		panic("unmatched AUTCoin serialized/deserialized")
+	}
+	if !reflect.DeepEqual(autCoin, coin) {
+		panic("unmatched AUTCoin serialized/deserialized")
+	}
 	return nil
 }
 
-func fetchRawAUTCoin(ns walletdb.ReadBucket, k []byte) (*AUTCoin, error) {
+func fetchRawAUTCoin(ns walletdb.ReadBucket, txHash chainhash.Hash, index uint8) (*AUTCoin, error) {
+	k := canonicalOutPointAbe(txHash, index)
 	v := ns.NestedReadBucket(bucketAUTPoint).Get(k)
 	if len(v) == 0 {
 		str := "failed to fetch aut coin"
@@ -276,13 +248,10 @@ func fetchRawAUTCoin(ns walletdb.ReadBucket, k []byte) (*AUTCoin, error) {
 	}
 
 	autCoin := new(AUTCoin)
-	op := &wire.OutPointAbe{}
-	err := readCanonicalOutPointAbe(k, op)
-	if err != nil {
-		str := "failed to deserialize the outpoint"
-		return nil, storeError(ErrDatabase, str, err)
-	}
-	err = autCoin.Deserialize(op, v)
+	err := autCoin.Deserialize(&wire.OutPointAbe{
+		TxHash: txHash,
+		Index:  index,
+	}, v)
 	if err != nil {
 		str := "failed to deserialize the aut coin"
 		return nil, storeError(ErrDatabase, str, err)
@@ -318,10 +287,13 @@ func valueBlockDisabledAUTRootCoins(outpoints []*wire.OutPointAbe) []byte {
 	}
 	return res
 }
-func putRawBlockDisabledAUTRootCoins(ns walletdb.ReadWriteBucket, k, v []byte) error {
+func putBlockDisabledAUTRootCoins(ns walletdb.ReadWriteBucket, blockHeight int32, blockHash chainhash.Hash, outpoints []*wire.OutPointAbe) error {
+	k := canonicalBlock(blockHeight, blockHash)
+	v := valueBlockDisabledAUTRootCoins(outpoints)
+
 	err := ns.NestedReadWriteBucket(bucketBlockDisabledAUTPoint).Put(k, v)
 	if err != nil {
-		str := "failed to put block input"
+		str := "failed to put disable aut points"
 		return storeError(ErrDatabase, str, err)
 	}
 	return nil
@@ -355,31 +327,17 @@ func deleteBlockDisabledAUTRootCoins(ns walletdb.ReadWriteBucket, k []byte) erro
 }
 
 // bucketAUTEntry:[autName -> [outpoint->aut coins]
-func spendAUTCoin(ns walletdb.ReadWriteBucket, k []byte) (*AUTCoin, bool, error) {
-	autPointBucket := ns.NestedReadWriteBucket(bucketAUTPoint)
-	v := autPointBucket.Get(k)
-	if len(v) == 0 {
-		return nil, false, nil
-	}
-
-	autCoin := new(AUTCoin)
-	op := &wire.OutPointAbe{}
-	err := readCanonicalOutPointAbe(k, op)
+func spendAUTCoin(ns walletdb.ReadWriteBucket, txHash chainhash.Hash, index uint8) (*AUTCoin, bool, error) {
+	autCoin, err := fetchRawAUTCoin(ns, txHash, index)
 	if err != nil {
-		str := "failed to deserialize the outpoint"
-		return nil, false, storeError(ErrDatabase, str, err)
-	}
-	err = autCoin.Deserialize(op, v)
-	if err != nil {
-		str := "failed to deserialize the aut coin"
-		return nil, false, storeError(ErrDatabase, str, err)
+		return nil, false, err
 	}
 
 	// record the status of aut coin to distinguish that is consumed or just disabled
 	spent := autCoin.Spent
-
 	autCoin.Spent = true
-	err = autPointBucket.Put(k, valueAUTCoin(autCoin))
+
+	err = putRawAUTCoin(ns, txHash, index, autCoin)
 	if err != nil {
 		str := "failed to spent aut coin"
 		return nil, false, storeError(ErrDatabase, str, err)
@@ -388,28 +346,15 @@ func spendAUTCoin(ns walletdb.ReadWriteBucket, k []byte) (*AUTCoin, bool, error)
 	return autCoin, spent, nil
 }
 
-func restoreAUTCoin(ns walletdb.ReadWriteBucket, k []byte) (*AUTCoin, error) {
-	autPointBucket := ns.NestedReadWriteBucket(bucketAUTPoint)
-	v := autPointBucket.Get(k)
-	if len(v) == 0 {
-		return nil, errors.New("non-exist aut coin")
-	}
-
-	autCoin := new(AUTCoin)
-	op := &wire.OutPointAbe{}
-	err := readCanonicalOutPointAbe(k, op)
+func restoreAUTCoin(ns walletdb.ReadWriteBucket, txHash chainhash.Hash, index uint8) (*AUTCoin, error) {
+	autCoin, err := fetchRawAUTCoin(ns, txHash, index)
 	if err != nil {
-		str := "failed to deserialize the outpoint"
-		return nil, storeError(ErrDatabase, str, err)
-	}
-	err = autCoin.Deserialize(op, v)
-	if err != nil {
-		str := "failed to deserialize the aut coin"
-		return nil, storeError(ErrDatabase, str, err)
+		return nil, err
 	}
 
 	autCoin.Spent = false
-	err = autPointBucket.Put(k, valueAUTCoin(autCoin))
+
+	err = putRawAUTCoin(ns, txHash, index, autCoin)
 	if err != nil {
 		str := "failed to spent aut coin"
 		return nil, storeError(ErrDatabase, str, err)

@@ -42,20 +42,13 @@ func (s *Store) unconfirmedTxRecords(ns walletdb.ReadBucket, unconfirmedTxCount 
 		// to avoid out-of-memory, just pseudo-random choose maxSize
 		rand.Seed(int64(time.Now().Nanosecond()))
 		unmined := make([]*TxRecord, 0)
-		err := ns.NestedReadBucket(bucketUnconfirmedTx).ForEach(func(k, v []byte) error {
+		err := ns.NestedReadBucket(bucketUnconfirmedTx).ForEach(func(_, v []byte) error {
 			if len(unmined) >= maxSize {
 				return nil
 			}
-
-			var txHash chainhash.Hash
-			err := readRawHash(k, &txHash)
-			if err != nil {
-				return err
-			}
-
 			if unconfirmedTxCount < int64(maxSize) || rand.Intn(int(unconfirmedTxCount)) < maxSize {
 				rec := new(TxRecord)
-				err = readRawTxRecord(&txHash, v, rec, bucketUnconfirmedTx)
+				err := rec.Deserialize(v)
 				if err != nil {
 					return err
 				}
@@ -68,15 +61,9 @@ func (s *Store) unconfirmedTxRecords(ns walletdb.ReadBucket, unconfirmedTxCount 
 	}
 
 	unmined := make([]*TxRecord, 0)
-	err := ns.NestedReadBucket(bucketUnconfirmedTx).ForEach(func(k, v []byte) error {
-		var txHash chainhash.Hash
-		err := readRawHash(k, &txHash)
-		if err != nil {
-			return err
-		}
-
+	err := ns.NestedReadBucket(bucketUnconfirmedTx).ForEach(func(_, v []byte) error {
 		rec := new(TxRecord)
-		err = readRawTxRecord(&txHash, v, rec, bucketUnconfirmedTx)
+		err := rec.Deserialize(v)
 		if err != nil {
 			return err
 		}
@@ -104,13 +91,13 @@ func (s *Store) unconfirmedTxCount(ns walletdb.ReadBucket) (int64, error) {
 
 func (s *Store) unconfirmedTxHashes(ns walletdb.ReadBucket) ([]*chainhash.Hash, error) {
 	var hashes []*chainhash.Hash
-	err := ns.NestedReadBucket(bucketUnconfirmedTx).ForEach(func(k, v []byte) error {
-		hash := new(chainhash.Hash)
-		err := readRawHash(k, hash)
-		if err == nil {
-			hashes = append(hashes, hash)
+	err := ns.NestedReadBucket(bucketUnconfirmedTx).ForEach(func(k, _ []byte) error {
+		hash, err := chainhash.NewHash(k)
+		if err != nil {
+			return err
 		}
-		return err
+		hashes = append(hashes, hash)
+		return nil
 	})
 	return hashes, err
 }
@@ -124,31 +111,27 @@ func (s *Store) ConfirmedTxs(ns walletdb.ReadBucket) ([]*TxRecord, error) {
 
 func (s *Store) confirmedTxHashes(ns walletdb.ReadBucket) ([]*chainhash.Hash, error) {
 	var hashes []*chainhash.Hash
-	err := ns.NestedReadBucket(bucketConfirmedTx).ForEach(func(k, v []byte) error {
-		hash := new(chainhash.Hash)
-		err := readRawHash(k, hash)
-		if err == nil {
-			hashes = append(hashes, hash)
+	err := ns.NestedReadBucket(bucketConfirmedTx).ForEach(func(k, _ []byte) error {
+		hash, err := chainhash.NewHash(k)
+		if err != nil {
+			return err
 		}
-		return err
+		hashes = append(hashes, hash)
+		return nil
 	})
 	return hashes, err
 }
 
 func (s *Store) confirmedTxs(ns walletdb.ReadBucket) ([]*TxRecord, error) {
 	var records []*TxRecord
-	err := ns.NestedReadBucket(bucketConfirmedTx).ForEach(func(k, v []byte) error {
-		hash := new(chainhash.Hash)
-		err := readRawHash(k, hash)
-		if err == nil {
-			rec := new(TxRecord)
-			err = readRawTxRecord(hash, v, rec, bucketConfirmedTx)
-			if err != nil {
-				return err
-			}
-			records = append(records, rec)
+	err := ns.NestedReadBucket(bucketConfirmedTx).ForEach(func(_, v []byte) error {
+		rec := new(TxRecord)
+		err := rec.Deserialize(v)
+		if err != nil {
+			return err
 		}
-		return err
+		records = append(records, rec)
+		return nil
 	})
 	return records, err
 }
@@ -160,31 +143,27 @@ func (s *Store) InvalidTxs(ns walletdb.ReadBucket) ([]*TxRecord, error) {
 }
 func (s *Store) invalidTxHashes(ns walletdb.ReadBucket) ([]*chainhash.Hash, error) {
 	var hashes []*chainhash.Hash
-	err := ns.NestedReadBucket(bucketInvalidTx).ForEach(func(k, v []byte) error {
-		hash := new(chainhash.Hash)
-		err := readRawHash(k, hash)
-		if err == nil {
-			hashes = append(hashes, hash)
+	err := ns.NestedReadBucket(bucketInvalidTx).ForEach(func(k, _ []byte) error {
+		hash, err := chainhash.NewHash(k)
+		if err != nil {
+			return err
 		}
-		return err
+		hashes = append(hashes, hash)
+		return nil
 	})
 	return hashes, err
 }
 
 func (s *Store) invalidTxs(ns walletdb.ReadBucket) ([]*TxRecord, error) {
 	var records []*TxRecord
-	err := ns.NestedReadBucket(bucketInvalidTx).ForEach(func(k, v []byte) error {
-		hash := new(chainhash.Hash)
-		err := readRawHash(k, hash)
-		if err == nil {
-			rec := new(TxRecord)
-			err = readRawTxRecord(hash, v, rec, bucketInvalidTx)
-			if err != nil {
-				return err
-			}
-			records = append(records, rec)
+	err := ns.NestedReadBucket(bucketInvalidTx).ForEach(func(_, v []byte) error {
+		rec := new(TxRecord)
+		err := rec.Deserialize(v)
+		if err != nil {
+			return err
 		}
-		return err
+		records = append(records, rec)
+		return nil
 	})
 	return records, err
 }

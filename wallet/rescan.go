@@ -176,11 +176,5 @@ func (w *Wallet) rescanWithTarget(startStamp *waddrmgr.BlockStamp) error {
 		return err
 	}
 
-	// check the status of all addresses
-	_ = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
-		addrmgrNs := tx.ReadBucket(waddrmgrNamespaceKey)
-		return w.Manager.CheckFreeAddress(addrmgrNs)
-	})
-
 	return nil
 }

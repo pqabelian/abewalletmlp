@@ -1,14 +1,11 @@
 package waddrmgr
 
 import (
-	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abewalletmlp/walletdb"
 	"github.com/abesuite/abewalletmlp/walletdb/migration"
-	"github.com/bits-and-blooms/bitset"
 	"time"
 )
 
@@ -16,27 +13,10 @@ import (
 // reflect the latest database state. If the database happens to be at a version
 // number lower than the latest, migrations will be performed in order to catch
 // it up.
-// TODO 20220610 re-define the version, currently there is just a version
 var versions = []migration.Version{
 	{
-		Number:    6,
+		Number:    0,
 		Migration: nil,
-	},
-	{
-		Number:    7,
-		Migration: nil,
-	},
-	{
-		Number:    8,
-		Migration: nil,
-	},
-	{
-		Number:    9,
-		Migration: populateIdxAddrBucket,
-	},
-	{
-		Number:    10,
-		Migration: populatePrivacyLevel,
 	},
 }
 
@@ -291,57 +271,6 @@ func storeMaxReorgDepth(ns walletdb.ReadWriteBucket) error {
 		if err := deleteBlockHash(ns, height); err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-func populateIdxAddrBucket(addrMgr walletdb.ReadWriteBucket) error {
-	mainBucket := addrMgr.NestedReadWriteBucket(mainBucketName)
-	// check whether the idx address bucket exist or not
-	// this bucket would store the map: addr key -> idx
-	idxAddrBucket, err := mainBucket.CreateBucketIfNotExists(idxAddrBucketName)
-	if err != nil {
-		str := "failed to create index address bucket"
-		return managerError(ErrDatabase, str, err)
-	}
-	// according idx -> addr key to build addr key -> idx
-	err = mainBucket.NestedReadBucket(addrIdxBucketName).ForEach(func(k, v []byte) error {
-		if err = idxAddrBucket.Put(v, k); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	// mark all address as used
-	seedCnt := mainBucket.Get(seedStatusName)
-	cnt := binary.LittleEndian.Uint64(seedCnt)
-	set := bitset.BitSet{}
-	for i := uint(0); i <= uint(cnt); i++ {
-		set.Set(i)
-	}
-	outputBuff := &bytes.Buffer{}
-	set.WriteTo(outputBuff)
-	err = mainBucket.Put(addrStatusName, outputBuff.Bytes())
-	if err != nil {
-		str := "failed to store seed status"
-		return managerError(ErrDatabase, str, err)
-	}
-	return nil
-}
-
-func populatePrivacyLevel(addrMgr walletdb.ReadWriteBucket) error {
-	mainBucket := addrMgr.NestedReadWriteBucket(mainBucketName)
-
-	if err := mainBucket.Put(cryptoSchemeName, []byte{0}); err != nil {
-		str := "failed to populate crypto scheme"
-		return managerError(ErrDatabase, str, err)
-	}
-	if err := mainBucket.Put(privacyLevelName, []byte{0}); err != nil {
-		str := "failed to populate privacy flag"
-		return managerError(ErrDatabase, str, err)
 	}
 
 	return nil

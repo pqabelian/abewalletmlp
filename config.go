@@ -118,10 +118,7 @@ type config struct {
 	MyVersion            string `long:"myversion" description:"Mnemonic version in non-interactive mode"`
 	MyMnemonic           string `long:"mymnemonic" description:"Mnemonic in non-interactive mode"`
 	MyPassword           string `long:"mypassword" description:"Password in non-interactive mode"`
-	MyRestoreNumber      uint64 `long:"myrestorenumber" description:"Number of restore address in non-interactive mode"`
 	MyWalletPass         string `long:"mywalletpass" description:"The public passphrase in non-interactive mode"`
-	WithPrivacyLevel     bool   `long:"withprivacylevel" description:"Whether or not the args containing privacy level"`
-	MyPrivacyLevel       uint8  `long:"myprivacylevel" description:"The privacy level in non-interactive mode"`
 }
 
 // cleanAndExpandPath expands environement variables and leading ~ in the
@@ -388,7 +385,7 @@ func loadConfig() (*config, []string, error) {
 	if numNets > 1 {
 		str := "%s: The testnet and simnet params can't be used " +
 			"together -- choose one"
-		err := fmt.Errorf(str, "loadConfig")
+		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -411,7 +408,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Parse, validate, and set debug log level(s).
 	if err := parseAndSetDebugLevels(cfg.DebugLevel); err != nil {
-		err := fmt.Errorf("%s: %v", "loadConfig", err.Error())
+		err := fmt.Errorf("%s: %v", funcName, err.Error())
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err

@@ -87,10 +87,6 @@ func walletMain() error {
 		startWalletRPCServices(w, rpcs, legacyRPCServer)
 	})
 
-	loader.RunAfterLoad(func(w *wallet.Wallet) {
-		w.SetChangeWithZeroAddr(cfg.ChangeWithInitialAddress)
-	})
-
 	if !cfg.NoInitialLoad {
 		// Load the wallet database.  It must have been created already
 		// or this will return an appropriate error.

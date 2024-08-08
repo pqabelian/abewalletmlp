@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"errors"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abewalletmlp/internal/prompt"
@@ -96,8 +95,8 @@ func (l *Loader) RunAfterLoad(fn func(*Wallet)) {
 // passphrases.  The seed is optional.  If non-nil, addresses are derived from
 // this seed.  If nil, a secure random seed is generated.
 
-func (l *Loader) CreateNewWallet(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel abecryptoxkey.PrivacyLevel,
-	pubPassphrase, privPassphrase, seed []byte, end uint64, bday time.Time, isWatchingOnly bool) (*Wallet, error) {
+func (l *Loader) CreateNewWallet(cryptoScheme abecryptoxparam.CryptoScheme,
+	pubPassphrase, privPassphrase, seed []byte, bday time.Time, isWatchingOnly bool) (*Wallet, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -125,16 +124,35 @@ func (l *Loader) CreateNewWallet(cryptoScheme abecryptoxparam.CryptoScheme, priv
 	}
 
 	// Initialize the newly created database for the wallet before opening.
-	err = Create(db, cryptoScheme, privacyLevel, pubPassphrase, privPassphrase, seed, end, l.chainParams, bday, isWatchingOnly)
+	// 1. create top level bucket for address manager
+	// 2. create top level bucket for transaction manager
+	// 3. create address manager based on create address bucket
+	// 3.1 create main bucket & sync bucket
+	// 3.2 record latest manager version
+	// 3.3 record create date
+	// 3.4 generate root seed from origin seed
+	// 3.5 random crypto key to encrypt address, seed and key
+	// 3.6 derive master key from public passphrase and private passphrase to protect crypto key
+	// 3.7 populate sync bucket
+	// 4. create transaction manager based on the created transaction bucket
+	// 4.1 populate version, create date and balance
+	// 4.2 populate data bucket for block, transaction, output, aut
+	err = Create(db, cryptoScheme, pubPassphrase, privPassphrase, seed, l.chainParams, bday, isWatchingOnly)
 	if err != nil {
 		return nil, err
 	}
 
 	// Open the newly-created wallet.
+	// 1. upgrade bucket when need
+	// 2. load address manager which includes crypto scheme, crypto keys, sync state
+	// 3. open store
 	w, err := Open(db, pubPassphrase, nil, l.chainParams, l.recoveryWindow)
 	if err != nil {
 		return nil, err
 	}
+
+	// start wallet and insert genesis block
+	// TODO(mlp) do not need this logic anymore for mlp wallet
 	w.Start()
 	err = walletdb.Update(w.db, func(tx walletdb.ReadWriteTx) error {
 		addrmgrNs := tx.ReadWriteBucket(waddrmgrNamespaceKey)
@@ -147,6 +165,7 @@ func (l *Loader) CreateNewWallet(cryptoScheme abecryptoxparam.CryptoScheme, priv
 		err = w.TxStore.InsertGenesisBlock(txmgrNs, addrmgrNs, genesisBlockRecords)
 		if err != nil {
 			log.Error("Fail to create wallet due to:", err)
+			return err
 		}
 		return nil
 

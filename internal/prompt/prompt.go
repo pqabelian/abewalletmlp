@@ -3,7 +3,6 @@ package prompt
 import (
 	"bufio"
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -18,7 +17,6 @@ import (
 )
 
 const SeedLength = 32
-const MAXCOUNTERADDRESS = 0xFFFF_FFFF_FFFF_FFFF
 
 // ProvideSeed is used to prompt for the wallet seed which maybe required during
 // upgrades.
@@ -246,17 +244,16 @@ func PrivacyLevel(reader *bufio.Reader, scheme abecryptoxparam.CryptoScheme) (ab
 // the user along with prompting them for confirmation.  When the user answers
 // yes, a the user is prompted for it.  All prompts are repeated until the user
 // enters a valid response.
-func Seed(reader *bufio.Reader) (abecryptoxparam.CryptoScheme, abecryptoxkey.PrivacyLevel, []byte, uint64, error) {
+func Seed(reader *bufio.Reader) (abecryptoxparam.CryptoScheme, []byte, error) {
 	// Ascertain the wallet generation seed.
 	useUserSeed, err := promptListBool(reader, "Do you have an "+
 		"existing wallet seed you want to use?", "no")
 	if err != nil {
-		return 0, 0, nil, 0, err
+		return 0, nil, err
 	}
 
 	// When user do not have any seed, generate one and use the latest crypto scheme as default
 	// meanwhile ask user to choose the privacy level
-	// currently 1 for Full-Privacy and 2 for Pseudonym
 	if !useUserSeed {
 		//seed, err := hdkeychain.GenerateSeed(hdkeychain.RecommendedSeedLen)
 		//seed, err := abesalrs.GenerateSeed(2*abesalrs.RecommendedSeedLen)
@@ -272,29 +269,29 @@ func Seed(reader *bufio.Reader) (abecryptoxparam.CryptoScheme, abecryptoxkey.Pri
 		cryptoScheme := abecryptoxparam.CryptoSchemePQRingCTX
 		entropy, err := NewEntropy(SeedLength)
 		if err != nil {
-			return 0, 0, nil, 0, errors.New("fail to generate entropy")
+			return 0, nil, errors.New("fail to generate entropy")
 		}
 
 		mnemonics, err := EntropyToWords(cryptoScheme, entropy, nil)
 		if err != nil {
-			return 0, 0, nil, 0, errors.New("fail to convert entropy to mnemonic")
+			return 0, nil, errors.New("fail to convert entropy to mnemonic")
 		}
 
 		seed, err := WordsToSeed(cryptoScheme, mnemonics, nil)
 		if err != nil {
-			return 0, 0, nil, 0, errors.New("fail to generate seed")
+			return 0, nil, errors.New("fail to generate seed")
 		}
 
 		// Ascertain the wallet privacy level.
-		privacyLevel, err := PrivacyLevel(reader, cryptoScheme)
-		if err != nil {
-			return 0, 0, nil, 0, errors.New("rand.Read() error in Seed()")
-		}
+		//privacyLevel, err := PrivacyLevel(reader, cryptoScheme)
+		//if err != nil {
+		//	return 0, 0, nil, 0, errors.New("rand.Read() error in Seed()")
+		//}
 
 		fmt.Println("Your wallet's generation seed is: ")
 		fmt.Printf("%x\n", seed)
 		fmt.Println("Your wallet's crypto version is: ", cryptoScheme)
-		fmt.Println("Your wallet's privacy level is: ", privacyLevel)
+		//fmt.Println("Your wallet's privacy level is: ", privacyLevel)
 		fmt.Println("Your wallet's mnemonic list is: ")
 		fmt.Printf("%v\n", strings.Join(mnemonics, ","))
 		fmt.Println("IMPORTANT: Keep the version and seed in a safe place as you\n" +
@@ -309,7 +306,7 @@ func Seed(reader *bufio.Reader) (abecryptoxparam.CryptoScheme, abecryptoxkey.Pri
 				`and secure location, enter "OK" to continue: `)
 			confirmSeed, err := reader.ReadString('\n')
 			if err != nil {
-				return 0, 0, nil, 0, err
+				return 0, nil, err
 			}
 			confirmSeed = strings.TrimSpace(confirmSeed)
 			confirmSeed = strings.Trim(confirmSeed, `"`)
@@ -318,15 +315,10 @@ func Seed(reader *bufio.Reader) (abecryptoxparam.CryptoScheme, abecryptoxkey.Pri
 			}
 		}
 
-		// add the cryptoScheme before seed
-		// TODO Maybe we can remove this logic
-		tmp := make([]byte, 4, 4+32)
-		binary.BigEndian.PutUint32(tmp[0:4], uint32(cryptoScheme))
-		seed = append(tmp, seed[:]...)
-
-		return cryptoScheme, privacyLevel, seed, MAXCOUNTERADDRESS, nil
+		return cryptoScheme, seed, nil
 	}
 
+	// recovery mode
 	var cryptoScheme abecryptoxparam.CryptoScheme
 	var seed []byte
 	for {
@@ -335,52 +327,29 @@ func Seed(reader *bufio.Reader) (abecryptoxparam.CryptoScheme, abecryptoxkey.Pri
 		cryptoSchemeStr = strings.TrimSpace(strings.ToLower(cryptoSchemeStr))
 		cryptoSchemeInt, err := strconv.Atoi(cryptoSchemeStr)
 		if err != nil {
-			fmt.Print("Please enter right crypto version")
+			fmt.Println("Please enter right crypto version")
 			continue
 		}
 		cryptoScheme = abecryptoxparam.CryptoScheme(cryptoSchemeInt)
 		if cryptoScheme != abecryptoxparam.CryptoSchemePQRingCTX {
 			if cryptoScheme == abecryptoxparam.CryptoSchemePQRingCT {
-				return 0, 0, nil, 0, fmt.Errorf("crypto version %d is supported by another wallet named abewalletlegacy", cryptoScheme)
+				return 0, nil, fmt.Errorf("crypto version %d is supported by another wallet named abewalletlegacy", cryptoScheme)
 			}
-			return 0, 0, nil, 0, errors.New("unsupported crypto scheme in current wallet version")
+			return 0, nil, errors.New("unsupported crypto scheme in current wallet version")
 		}
 
 		fmt.Print("Enter existing wallet mnemonic: ")
 		mnemonicWords, err := reader.ReadString('\n')
 		if err != nil {
-			return 0, 0, nil, 0, err
+			return 0, nil, err
 		}
 		mnemonicWords = strings.TrimSpace(strings.ToLower(mnemonicWords))
 		mnemonics := strings.Split(mnemonicWords, ",")
 		seed, err = WordsToSeed(cryptoScheme, mnemonics, wordlists.EnglishMap)
 		if err != nil {
-			return 0, 0, nil, 0, err
+			return 0, nil, err
 		}
 
-		// add the cryptoScheme before seed
-		// TODO Maybe we can remove this logic
-		tmp := make([]byte, 4, 4+SeedLength)
-		binary.BigEndian.PutUint32(tmp[0:4], uint32(cryptoScheme))
-		seed = append(tmp, seed[:]...)
-
-		if cryptoScheme == abecryptoxparam.CryptoSchemePQRingCT {
-			var recoveryAddressNum uint64
-			fmt.Print("Please input the max No. of address to recover :")
-			numStr, err := reader.ReadString('\n')
-			numStr = strings.TrimSpace(numStr)
-			recoveryAddressNum, err = strconv.ParseUint(numStr, 10, 0)
-			if err != nil {
-				return 0, 0, nil, 0, err
-			}
-			return cryptoScheme, 0, seed, recoveryAddressNum, nil
-		}
-		if cryptoScheme == abecryptoxparam.CryptoSchemePQRingCTX {
-			privacyLevel, err := PrivacyLevel(reader, cryptoScheme)
-			if err != nil {
-				return 0, 0, nil, 0, err
-			}
-			return cryptoScheme, privacyLevel, seed, 0, nil
-		}
+		return cryptoScheme, seed, nil
 	}
 }

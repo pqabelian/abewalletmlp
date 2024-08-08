@@ -369,10 +369,10 @@ func getBalances(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		ImmatureTRBalance  float64 `json:"immature_tr_balance"`
 		UnconfirmedBalance float64 `json:"unconfirmed_balance"`
 
-		AUTRootCoinNums          map[string]uint64 `json:"aut_root_coin_numes"`
-		AUTImmatureRootCoinNums  map[string]uint64 `json:"aut_immature_root_coin_numes"`
-		AUTSpendableRootCoinNums map[string]uint64 `json:"aut_spendable_root_coin_numes"`
-		UnconfirmedRootCoinNums  map[string]uint64 `json:"aut_unconfirmed_root_coin_numes"`
+		AUTRootCoinNums          map[string]uint64 `json:"aut_root_coin_nums"`
+		AUTImmatureRootCoinNums  map[string]uint64 `json:"aut_immature_root_coin_nums"`
+		AUTSpendableRootCoinNums map[string]uint64 `json:"aut_spendable_root_coin_nums"`
+		UnconfirmedRootCoinNums  map[string]uint64 `json:"aut_unconfirmed_root_coin_nums"`
 
 		AUTBalances            map[string]uint64 `json:"aut_balances"`
 		AUTImmatureBalances    map[string]uint64 `json:"aut_immature_balances"`
@@ -719,18 +719,21 @@ func listLockUnspent(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 
 // For test
 type utxo struct {
-	RingHash         string
-	TxHash           string
-	Index            uint8
-	FromCoinbase     bool
-	Amount           uint64
-	Height           int32
-	UTXOHash         chainhash.Hash `json:"-"`
-	UTXOHashStr      string
-	SpentByTxHash    chainhash.Hash `json:"-"`
-	SpentByTxHashStr string         `json:"spentByTxHashStr,omitempty"`
-	SpentTime        string         `json:"spentTime,omitempty"`
-	ConfirmTime      string         `json:"confirmTime,omitempty"`
+	RingHash           string
+	TxHash             string
+	Index              uint8
+	FromCoinbase       bool
+	Pseudonymous       bool
+	IsAUTCoin          bool
+	Amount             uint64
+	Height             int32
+	UTXOHash           chainhash.Hash `json:"-"`
+	UTXOHashStr        string
+	SpentByTxHash      chainhash.Hash `json:"-"`
+	SpentByTxHashStr   string         `json:"spentByTxHashStr,omitempty"`
+	SpentTime          string         `json:"spentTime,omitempty"`
+	ConfirmByBlockHash string         `json:"confirmByBlockHash,omitempty"`
+	ConfirmTime        string         `json:"confirmTime,omitempty"`
 }
 type utxoset []utxo
 
@@ -765,7 +768,9 @@ func listAllUTXOAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 			RingHash:     utxos[i].RingHash.String(),
 			TxHash:       utxos[i].TxOutput.TxHash.String(),
 			Index:        utxos[i].TxOutput.Index,
-			FromCoinbase: utxos[i].FromCoinBase,
+			FromCoinbase: utxos[i].IsCoinbase(),
+			Pseudonymous: utxos[i].IsPseudonymous(),
+			IsAUTCoin:    utxos[i].IsAUTCoin(),
 			Amount:       utxos[i].Amount,
 			Height:       utxos[i].Height,
 			UTXOHash:     utxos[i].Hash(),
@@ -777,7 +782,9 @@ func listAllUTXOAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 			RingHash:     unmatureds[i].RingHash.String(),
 			TxHash:       unmatureds[i].TxOutput.TxHash.String(),
 			Index:        unmatureds[i].TxOutput.Index,
-			FromCoinbase: unmatureds[i].FromCoinBase,
+			FromCoinbase: unmatureds[i].IsCoinbase(),
+			Pseudonymous: unmatureds[i].IsPseudonymous(),
+			IsAUTCoin:    unmatureds[i].IsAUTCoin(),
 			Amount:       unmatureds[i].Amount,
 			Height:       unmatureds[i].Height,
 			UTXOHash:     unmatureds[i].Hash(),
@@ -807,7 +814,9 @@ func listUnmaturedUTXOAbe(icmd interface{}, w *wallet.Wallet) (interface{}, erro
 			RingHash:     unmatureds[i].RingHash.String(),
 			TxHash:       unmatureds[i].TxOutput.TxHash.String(),
 			Index:        unmatureds[i].TxOutput.Index,
-			FromCoinbase: unmatureds[i].FromCoinBase,
+			FromCoinbase: unmatureds[i].IsCoinbase(),
+			Pseudonymous: unmatureds[i].IsPseudonymous(),
+			IsAUTCoin:    unmatureds[i].IsAUTCoin(),
 			Amount:       unmatureds[i].Amount,
 			Height:       unmatureds[i].Height,
 			UTXOHash:     unmatureds[i].Hash(),
@@ -838,7 +847,9 @@ func listUnspentAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 			RingHash:     utxos[i].RingHash.String(),
 			TxHash:       utxos[i].TxOutput.TxHash.String(),
 			Index:        utxos[i].TxOutput.Index,
-			FromCoinbase: utxos[i].FromCoinBase,
+			FromCoinbase: utxos[i].IsCoinbase(),
+			Pseudonymous: utxos[i].IsPseudonymous(),
+			IsAUTCoin:    utxos[i].IsAUTCoin(),
 			Amount:       utxos[i].Amount,
 			Height:       utxos[i].Height,
 			UTXOHash:     utxos[i].Hash(),
@@ -861,12 +872,14 @@ func listUnspentCoinbaseAbe(icmd interface{}, w *wallet.Wallet) (interface{}, er
 	}
 	res := make([]utxo, 0, len(utxos))
 	for i := 0; i < len(utxos); i++ {
-		if utxos[i].FromCoinBase {
+		if utxos[i].IsCoinbase() {
 			res = append(res, utxo{
 				RingHash:     utxos[i].RingHash.String(),
 				TxHash:       utxos[i].TxOutput.TxHash.String(),
 				Index:        utxos[i].TxOutput.Index,
-				FromCoinbase: utxos[i].FromCoinBase,
+				FromCoinbase: utxos[i].IsCoinbase(),
+				Pseudonymous: utxos[i].IsPseudonymous(),
+				IsAUTCoin:    utxos[i].IsAUTCoin(),
 				Amount:       utxos[i].Amount,
 				Height:       utxos[i].Height,
 				UTXOHash:     utxos[i].Hash(),
@@ -896,7 +909,9 @@ func listSpentButUnminedAbe(icmd interface{}, w *wallet.Wallet) (interface{}, er
 			RingHash:         sbutxos[i].RingHash.String(),
 			TxHash:           sbutxos[i].TxOutput.TxHash.String(),
 			Index:            sbutxos[i].TxOutput.Index,
-			FromCoinbase:     sbutxos[i].FromCoinBase,
+			FromCoinbase:     sbutxos[i].IsCoinbase(),
+			Pseudonymous:     sbutxos[i].IsPseudonymous(),
+			IsAUTCoin:        sbutxos[i].IsAUTCoin(),
 			Amount:           sbutxos[i].Amount,
 			Height:           sbutxos[i].Height,
 			UTXOHash:         sbutxos[i].Hash(),
@@ -926,18 +941,21 @@ func listSpentAndMinedAbe(icmd interface{}, w *wallet.Wallet) (interface{}, erro
 	res := make([]utxo, 0, len(sctxos))
 	for i := 0; i < len(sctxos); i++ {
 		res = append(res, utxo{
-			RingHash:         sctxos[i].RingHash.String(),
-			TxHash:           sctxos[i].TxOutput.TxHash.String(),
-			Index:            sctxos[i].TxOutput.Index,
-			FromCoinbase:     sctxos[i].FromCoinBase,
-			Amount:           sctxos[i].Amount,
-			Height:           sctxos[i].Height,
-			UTXOHash:         sctxos[i].Hash(),
-			UTXOHashStr:      sctxos[i].Hash().String(),
-			SpentByTxHash:    sctxos[i].SpentByHash,
-			SpentByTxHashStr: sctxos[i].SpentByHash.String(),
-			SpentTime:        sctxos[i].SpentTime.Format("2006-01-02 15:04:05"),
-			ConfirmTime:      sctxos[i].ConfirmTime.Format("2006-01-02 15:04:05"),
+			RingHash:           sctxos[i].RingHash.String(),
+			TxHash:             sctxos[i].TxOutput.TxHash.String(),
+			Index:              sctxos[i].TxOutput.Index,
+			FromCoinbase:       sctxos[i].IsCoinbase(),
+			Pseudonymous:       sctxos[i].IsPseudonymous(),
+			IsAUTCoin:          sctxos[i].IsAUTCoin(),
+			Amount:             sctxos[i].Amount,
+			Height:             sctxos[i].Height,
+			UTXOHash:           sctxos[i].Hash(),
+			UTXOHashStr:        sctxos[i].Hash().String(),
+			SpentByTxHash:      sctxos[i].SpentByHash,
+			SpentByTxHashStr:   sctxos[i].SpentByHash.String(),
+			SpentTime:          sctxos[i].SpentTime.Format("2006-01-02 15:04:05"),
+			ConfirmByBlockHash: sctxos[i].ConfirmedByBlockHash.String(),
+			ConfirmTime:        sctxos[i].ConfirmTime.Format("2006-01-02 15:04:05"),
 		})
 	}
 	if !segment {
@@ -950,10 +968,6 @@ func listSpentAndMinedAbe(icmd interface{}, w *wallet.Wallet) (interface{}, erro
 
 func listAUTCoins(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.ListAUTCoinsCmd)
-
-	if w.Manager.GetPrivacyLevel() != abecryptoxkey.PrivacyLevelPSEUDONYM {
-		return nil, fmt.Errorf("currently ONLY pseudonym-address abewalletmlp support AUT")
-	}
 
 	rootCoinOnly := cmd.RootCoinOnly != nil && *cmd.RootCoinOnly
 	autIdentifier := ""
@@ -1361,7 +1375,8 @@ func isHexString(s string) bool {
 }*/
 
 func sendAddressAbe(w *wallet.Wallet, amounts []abejson.Pair,
-	minconf int32, feePerKbSpecified abeutil.Amount, feeSpecified abeutil.Amount, utxoSpecified []string) (string, error) {
+	minconf int32, feePerKbSpecified abeutil.Amount, feeSpecified abeutil.Amount, utxoSpecified []string,
+	specifiedPrivacyLevel *abecryptoxkey.PrivacyLevel, changeToPrivacyLevel *abecryptoxkey.PrivacyLevel) (string, error) {
 
 	outputDescs, err := makeOutputDescsForPairs(w, amounts, w.ChainParams())
 	if err != nil {
@@ -1390,7 +1405,7 @@ func sendAddressAbe(w *wallet.Wallet, amounts []abejson.Pair,
 			}
 		}
 	}
-	tx, err := w.SendOutputs(outputDescs, minconf, feePerKbSpecified, feeSpecified, utxoSpecified, "", requestHash) // TODO(abe): what's label?
+	tx, err := w.SendOutputs(outputDescs, minconf, feePerKbSpecified, feeSpecified, utxoSpecified, specifiedPrivacyLevel, changeToPrivacyLevel, "", requestHash) // TODO(abe): what's label?
 	if err != nil {
 		if err == txrules.ErrAmountNegative {
 			return "", ErrNeedPositiveAmount
@@ -1445,16 +1460,7 @@ func sendAddressAbeAUT(w *wallet.Wallet, autTransaction aut.Transaction, amounts
 	}
 	txHashStr := tx.Tx.TxHash().String()
 	log.Infof("Successfully sent transaction %v", txHashStr)
-	res := txHashStr
-	if w.Manager.GetCryptoScheme() == abecryptoxparam.CryptoSchemePQRingCT {
-		addressNum, err := w.AddressMaxSequenceNumber()
-		if err != nil {
-			res = txHashStr
-		} else {
-			res = txHashStr + fmt.Sprintf("\nCurrent max No. of address is %d", addressNum)
-		}
-	}
-	return res, nil
+	return txHashStr, nil
 }
 
 func sendPairsAbe(w *wallet.Wallet, amounts map[string]abeutil.Amount,
@@ -1465,7 +1471,7 @@ func sendPairsAbe(w *wallet.Wallet, amounts map[string]abeutil.Amount,
 	if err != nil {
 		return "", err
 	}
-	tx, err := w.SendOutputs(outputDescs, minconf, feePerKbSpecified, feeSpecified, utxoSpecified, "", nil) // TODO(abe): what's label?
+	tx, err := w.SendOutputs(outputDescs, minconf, feePerKbSpecified, feeSpecified, utxoSpecified, nil, nil, "", nil) // TODO(abe): what's label?
 	if err != nil {
 		if err == txrules.ErrAmountNegative {
 			return "", ErrNeedPositiveAmount
@@ -1566,46 +1572,22 @@ func sendToPayees(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 // Upon success, the TxID for the created transaction is returned.
 
 func addressMaxSequenceNumber(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
-	_ = icmd.(*abejson.AddressMaxSequenceNumberCmd)
-	if w.Manager.GetCryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
-		return nil, errors.New("current wallet do not use the concept of sequence number")
-	}
-
-	addressMaxSN, err := w.AddressMaxSequenceNumber()
-	if err != nil {
-		return -1, err
-	}
-	return addressMaxSN, nil
+	return nil, errors.New("current wallet do not use the concept of sequence number")
 }
 
 func addressRange(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
-	cmd := icmd.(*abejson.AddressRangeCmd)
-	if w.Manager.GetCryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
-		return nil, errors.New("current wallet can not export address because it do not use the concept of sequence number")
-	}
-	res, err := w.AddressRange(cmd.Start, cmd.End)
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
+	return nil, errors.New("current wallet can not export address because it do not use the concept of sequence number")
 }
 
 // The result would be a hex.EncodeToString([]byte) to a string
 func exportAddressKeyRandSeed(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
-	cmd := icmd.(*abejson.ExportRangeCmd)
-	if w.Manager.GetCryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
-		return nil, errors.New("current wallet can not export any seed because it do not use the concept of sequence number")
-	}
-	res, err := w.ExportAddressKeyRandSeed(cmd.Start, cmd.End)
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
+	return nil, errors.New("current wallet can not export any seed because it do not use the concept of sequence number")
 }
 
 func generateAddressAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.GenerateAddressCmd)
 	number := *cmd.Num
+	privacyLevel := *cmd.PrivacyLevel
 
 	if w.Manager.IsLocked() {
 		return nil, errors.New("wallet is locked")
@@ -1618,7 +1600,7 @@ func generateAddressAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 	for i := 0; i < number; i++ {
 		var address []byte
 		var netID []byte
-		netID, numberOrder[i], address, err = w.NewAddressKey(false)
+		netID, address, err = w.NewAddressKey(abecryptoxkey.PrivacyLevel(privacyLevel))
 		if err != nil {
 			return nil, err
 		}
@@ -1644,27 +1626,7 @@ func generateAddressAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 	return res, nil
 }
 func listFreeAddress(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
-	_ = icmd.(*abejson.ListFreeAddressesCmd)
-	if w.Manager.GetCryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
-		return nil, errors.New("current wallet do not use the concept of free address")
-	}
-
-	addressBytes, err := w.ListFreeAddresses()
-	if err != nil {
-		return nil, err
-	}
-	type tt struct {
-		No_  uint64 `json:"No,omitempty"`
-		Addr string `json:"addr,omitempty"`
-	}
-	res := make([]*tt, 0, len(addressBytes))
-	for idx, addressByte := range addressBytes {
-		res = append(res, &tt{
-			No_:  idx,
-			Addr: hex.EncodeToString(addressByte),
-		})
-	}
-	return res, nil
+	return nil, errors.New("current wallet do not use the concept of free address")
 }
 func sendToAddressesAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.SendToAddressAbeCmd)
@@ -1718,15 +1680,27 @@ func sendToAddressesAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 		}
 	}
 
-	return sendAddressAbe(w, cmd.Amounts, minConf, feeSatPerKb, feeSpecified, utxoSpecified)
+	var pspecifiedPrivacyLevel *abecryptoxkey.PrivacyLevel
+	if cmd.ConsumePseudonymous != nil {
+		specifiedPrivacyLevel := abecryptoxkey.PrivacyLevelRINGCT
+		if *cmd.ConsumePseudonymous {
+			specifiedPrivacyLevel = abecryptoxkey.PrivacyLevelPSEUDONYM
+		}
+		pspecifiedPrivacyLevel = &specifiedPrivacyLevel
+	}
+	var pchangeToPrivacyLevel *abecryptoxkey.PrivacyLevel
+	if cmd.ChangeToPseudonymous != nil {
+		changeToPrivacyLevel := abecryptoxkey.PrivacyLevelRINGCT
+		if *cmd.ChangeToPseudonymous {
+			changeToPrivacyLevel = abecryptoxkey.PrivacyLevelPSEUDONYM
+		}
+		pchangeToPrivacyLevel = &changeToPrivacyLevel
+	}
+	return sendAddressAbe(w, cmd.Amounts, minConf, feeSatPerKb, feeSpecified, utxoSpecified, pspecifiedPrivacyLevel, pchangeToPrivacyLevel)
 }
 
 func registerAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.RegisterAUTTransactionCmd)
-	// according command to  build the output
-	if w.Manager.GetPrivacyLevel() != abecryptoxkey.PrivacyLevelPSEUDONYM {
-		return nil, fmt.Errorf("currently ONLY pseudonym-address abewalletmlp support AUT")
-	}
 
 	if len(cmd.AUTIdentifier) != aut.IdentifierLength {
 		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d", aut.IdentifierLength, len(cmd.AUTIdentifier))
@@ -1798,10 +1772,6 @@ func registerAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, er
 
 func mintAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.MintAUTTransactionCmd)
-	// according command to  build the output
-	if w.Manager.GetPrivacyLevel() != abecryptoxkey.PrivacyLevelPSEUDONYM {
-		return nil, fmt.Errorf("currently ONLY pseudonym-address abewalletmlp support AUT")
-	}
 
 	if len(cmd.AUTIdentifier) != aut.IdentifierLength {
 		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d", aut.IdentifierLength, len(cmd.AUTIdentifier))
@@ -1829,10 +1799,6 @@ func mintAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 
 func transferAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.TransferAUTTransactionCmd)
-	// according command to  build the output
-	if w.Manager.GetPrivacyLevel() != abecryptoxkey.PrivacyLevelPSEUDONYM {
-		return nil, fmt.Errorf("currently ONLY pseudonym-address abewalletmlp support AUT")
-	}
 
 	if len(cmd.AUTIdentifier) != aut.IdentifierLength {
 		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d", aut.IdentifierLength, len(cmd.AUTIdentifier))
@@ -1863,10 +1829,6 @@ func transferAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 
 func reRegisterAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.ReRegisterAUTTransactionCmd)
-	// according command to  build the output
-	if w.Manager.GetPrivacyLevel() != abecryptoxkey.PrivacyLevelPSEUDONYM {
-		return nil, fmt.Errorf("currently ONLY pseudonym-address abewalletmlp support AUT")
-	}
 
 	if len(cmd.AUTIdentifier) != aut.IdentifierLength {
 		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d", aut.IdentifierLength, len(cmd.AUTIdentifier))
@@ -1929,9 +1891,6 @@ func reRegisterAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, 
 
 func burnAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.BurnAUTTransactionCmd)
-	if w.Manager.GetPrivacyLevel() != abecryptoxkey.PrivacyLevelPSEUDONYM {
-		return nil, fmt.Errorf("currently ONLY pseudonym-address abewalletmlp support AUT")
-	}
 
 	utxosSpecified := strings.Split(cmd.UTXOSpescified, ",")
 	if len(utxosSpecified) == 0 {

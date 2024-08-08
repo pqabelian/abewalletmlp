@@ -2,10 +2,8 @@ package main
 
 import (
 	"bufio"
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abewalletmlp/wordlists"
 	"os"
@@ -50,6 +48,10 @@ func createWallet(cfg *config) error {
 	dbDir := networkDir(cfg.AppDataDir.Value, activeNet.Params)
 	loader := wallet.NewLoader(activeNet.Params, dbDir, true, 250)
 
+	var cryptoScheme abecryptoxparam.CryptoScheme
+	var pubPass, privPass []byte
+	var seed []byte
+	var err error
 	// When there is a legacy keystore, open it now to ensure any errors
 	// don't end up exiting the process after the user has spent time
 	// entering a bunch of information.
@@ -58,19 +60,14 @@ func createWallet(cfg *config) error {
 		// existing keystore, the user will be promped for that passphrase,
 		// otherwise they will be prompted for a new one.
 		reader := bufio.NewReader(os.Stdin)
-		privPass, err := prompt.PrivatePass(reader)
+		privPass, err = prompt.PrivatePass(reader)
 		if err != nil {
 			return err
 		}
-
-		// When there exists a legacy keystore, unlock it now and set up a
-		// callback to import all keystore keys into the new walletdb
-		// wallet
-
 		// Ascertain the public passphrase.  This will either be a value
 		// specified by the user or the default hard-coded public passphrase if
 		// the user does not want the additional public data encryption.
-		pubPass, err := prompt.PublicPass(reader, privPass,
+		pubPass, err = prompt.PublicPass(reader, privPass,
 			[]byte(cfg.WalletPass))
 		if err != nil {
 			return err
@@ -79,36 +76,11 @@ func createWallet(cfg *config) error {
 		// Ascertain the wallet generation seed.  This will either be an
 		// automatically generated value the user has already confirmed or a
 		// value the user has entered which has already been validated.
-
-		// (crypto_scheme,privacy_level)
-		// TODO introduce a transfer level to unify crypto scheme
-		// user view -> dev view
-		// (0,0)     -> (1,0)
-		// (1,1)     -> (1,1)
-		// (1,2)     -> (1,2)
-		cryptoScheme, privacyLevel, seed, end, err := prompt.Seed(reader)
+		cryptoScheme, seed, err = prompt.Seed(reader)
 		if err != nil {
 			return err
 		}
-
-		fmt.Println("Creating the wallet...")
-
-		if cryptoScheme == abecryptoxparam.CryptoSchemePQRingCT && end == prompt.MAXCOUNTERADDRESS && cfg.MyRestoreNumber != 0 {
-			end = cfg.MyRestoreNumber
-		}
-
-		w, err := loader.CreateNewWallet(cryptoScheme, privacyLevel, pubPass, privPass, seed[4:], end, time.Now(), true)
-		if err != nil {
-			return err
-		}
-
-		w.Manager.Close()
-		fmt.Println("The wallet has been created successfully.")
 	} else if cfg.NonInteractiveCreate {
-		// default crypto scheme and privacy level
-		cryptoScheme := abecryptoxparam.CryptoSchemePQRingCTX
-		privacyLevel := abecryptoxkey.PrivacyLevelRINGCT
-
 		// try to read from config
 		cryptoSchemeStr := strings.TrimSpace(strings.ToLower(cfg.MyVersion))
 		cryptoSchemeInt, err := strconv.Atoi(cryptoSchemeStr)
@@ -116,67 +88,48 @@ func createWallet(cfg *config) error {
 			return err
 		}
 		cryptoScheme = abecryptoxparam.CryptoScheme(cryptoSchemeInt)
-		if cryptoScheme != abecryptoxparam.CryptoSchemePQRingCT &&
-			cryptoScheme != abecryptoxparam.CryptoSchemePQRingCTX {
+		if cryptoScheme != abecryptoxparam.CryptoSchemePQRingCTX {
+			if cryptoScheme == abecryptoxparam.CryptoSchemePQRingCT {
+				return errors.New("please use abewallet legacy with specified crypto version\n")
+			}
 			return errors.New("Invalid crypto version specified\n")
 		}
 
-		if cryptoScheme == abecryptoxparam.CryptoSchemePQRingCT {
-			privacyLevel = abecryptoxkey.PrivacyLevelRINGCTPre
-		}
-		if cryptoScheme == abecryptoxparam.CryptoSchemePQRingCTX {
-			if !cfg.WithPrivacyLevel {
-				return errors.New("No privacy level specified\n")
-			}
-			privacyLevel = abecryptoxkey.PrivacyLevel(cfg.MyPrivacyLevel)
-			if /*privacyLevel != abecryptoxkey.PrivacyLevelRINGCTPre &&*/
-			privacyLevel != abecryptoxkey.PrivacyLevelRINGCT &&
-				privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
-				return errors.New("Invalid privacy level specified\n")
-			}
-		}
-
-		var seed []byte
 		var mnemonics []string
 		if !cfg.WithMnemonic {
 			entropy, err := prompt.NewEntropy(prompt.SeedLength)
+			if err != nil {
+				return err
+			}
 			mnemonics, err = prompt.EntropyToWords(cryptoScheme, entropy, wordlists.English)
 			if err != nil {
 				return err
 			}
-			seed, err = prompt.WordsToSeed(cryptoScheme, mnemonics, wordlists.EnglishMap)
-			if err != nil {
-				return err
-			}
-
-			cfg.MyRestoreNumber = prompt.MAXCOUNTERADDRESS
 		} else {
 			mnemonics = strings.Split(cfg.MyMnemonic, ",")
-			seed, err = prompt.WordsToSeed(cryptoScheme, mnemonics, wordlists.EnglishMap)
-			if err != nil {
-				return err
-			}
 		}
-		tmp := make([]byte, 4, 4+prompt.SeedLength)
-		binary.BigEndian.PutUint32(tmp[0:4], uint32(cryptoScheme))
-		seed = append(tmp, seed[:]...)
-
-		fmt.Println(binary.BigEndian.Uint32(seed[:4]))
-		fmt.Printf("%x\n", seed[4:])
-		fmt.Printf("%v\n", strings.Join(mnemonics, ","))
-		if cfg.MyWalletPass == "" {
-			cfg.MyWalletPass = wallet.InsecurePubPassphrase
-		}
-
-		w, err := loader.CreateNewWallet(cryptoScheme, privacyLevel,
-			[]byte(cfg.MyWalletPass), []byte(cfg.MyPassword),
-			seed[4:], cfg.MyRestoreNumber, time.Now(), true)
+		seed, err = prompt.WordsToSeed(cryptoScheme, mnemonics, wordlists.EnglishMap)
 		if err != nil {
 			return err
 		}
 
-		w.Manager.Close()
+		fmt.Println(cryptoScheme)
+		fmt.Printf("%x\n", seed)
+		fmt.Printf("%v\n", strings.Join(mnemonics, ","))
+		if cfg.MyWalletPass == "" {
+			cfg.MyWalletPass = wallet.InsecurePubPassphrase
+		}
+		pubPass = []byte(cfg.MyWalletPass)
+		privPass = []byte(cfg.MyPassword)
 	}
+
+	fmt.Println("Creating the wallet...")
+	w, err := loader.CreateNewWallet(cryptoScheme, pubPass, privPass, seed, time.Now(), true)
+	if err != nil {
+		return err
+	}
+	w.Manager.Close()
+	fmt.Println("The wallet has been created successfully.")
 
 	return nil
 }
@@ -204,7 +157,7 @@ func createSimulationWallet(cfg *config) error {
 	defer db.Close()
 
 	// Create the wallet.
-	err = wallet.Create(db, abecryptoxparam.CryptoSchemePQRingCTX, abecryptoxkey.PrivacyLevelRINGCT, pubPass, privPass, nil, 0, activeNet.Params, time.Now(), false)
+	err = wallet.Create(db, abecryptoxparam.CryptoSchemePQRingCTX, pubPass, privPass, nil, activeNet.Params, time.Now(), false)
 	if err != nil {
 		return err
 	}
