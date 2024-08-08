@@ -2119,43 +2119,43 @@ func createBuckets(ns walletdb.ReadWriteBucket) error {
 	}
 	//TODO(abe): change the name of bucket
 	if _, err := ns.CreateBucket(bucketBlocks); err != nil {
-		str := "fialed to create block bucket"
+		str := "failed to create block bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if _, err := ns.CreateBucket(bucketBlockInputs); err != nil {
-		str := "fialed to create block input bucket"
+		str := "failed to create block input bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if _, err := ns.CreateBucket(bucketBlockOutputs); err != nil {
-		str := "fialed to create block output bucket"
+		str := "failed to create block output bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if _, err := ns.CreateBucket(bucketImmaturedCoinbaseOutput); err != nil {
-		str := "fialed to create immature coinbase txo bucket"
+		str := "failed to create immature coinbase txo bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if _, err := ns.CreateBucket(bucketImmaturedOutput); err != nil {
-		str := "fialed to create immature txo bucket"
+		str := "failed to create immature txo bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if _, err := ns.CreateBucket(bucketMaturedOutput); err != nil {
-		str := "fialed to create mature txo bucket"
+		str := "failed to create mature txo bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if _, err := ns.CreateBucket(bucketSpentButUnmined); err != nil {
-		str := "fialed to create unspent but unmined txo bucket"
+		str := "failed to create unspent but unmined txo bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if _, err := ns.CreateBucket(bucketSpentConfirmed); err != nil {
-		str := "fialed to create spent and confirmed bucket"
+		str := "failed to create spent and confirmed bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if _, err := ns.CreateBucket(bucketUTXORing); err != nil {
-		str := "fialed to create utxo ring bucket"
+		str := "failed to create utxo ring bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if _, err := ns.CreateBucket(bucketRingDetails); err != nil {
-		str := "fialed to create ring details bucket"
+		str := "failed to create ring details bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 
@@ -2178,11 +2178,11 @@ func createBuckets(ns walletdb.ReadWriteBucket) error {
 	}
 
 	if _, err := ns.CreateBucket(bucketAUTPoint); err != nil {
-		str := "fialed to create aut point bucket"
+		str := "failed to create aut point bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if _, err := ns.CreateBucket(bucketBlockDisabledAUTPoint); err != nil {
-		str := "fialed to create block disbaled aut point bucket"
+		str := "failed to create block disbaled aut point bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 
@@ -2198,43 +2198,43 @@ func deleteBuckets(ns walletdb.ReadWriteBucket) error {
 	}
 	//TODO(abe):change the name of bucket
 	if err := ns.DeleteNestedBucket(bucketBlocks); err != nil {
-		str := "fialed to delete block bucket"
+		str := "failed to delete block bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if err := ns.DeleteNestedBucket(bucketBlockInputs); err != nil {
-		str := "fialed to delete block input bucket"
+		str := "failed to delete block input bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if err := ns.DeleteNestedBucket(bucketBlockOutputs); err != nil {
-		str := "fialed to delete block output bucket"
+		str := "failed to delete block output bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if err := ns.DeleteNestedBucket(bucketImmaturedCoinbaseOutput); err != nil {
-		str := "fialed to delete immature coinbase txo bucket"
+		str := "failed to delete immature coinbase txo bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if err := ns.DeleteNestedBucket(bucketImmaturedOutput); err != nil {
-		str := "fialed to delete immature txo bucket"
+		str := "failed to delete immature txo bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if err := ns.DeleteNestedBucket(bucketMaturedOutput); err != nil {
-		str := "fialed to delete mature txo bucket"
+		str := "failed to delete mature txo bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if err := ns.DeleteNestedBucket(bucketSpentButUnmined); err != nil {
-		str := "fialed to delete spent but unmined txo bucket"
+		str := "failed to delete spent but unmined txo bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if err := ns.DeleteNestedBucket(bucketSpentConfirmed); err != nil {
-		str := "fialed to delete spent and confirmed txo bucket"
+		str := "failed to delete spent and confirmed txo bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if err := ns.DeleteNestedBucket(bucketUTXORing); err != nil {
-		str := "fialed to delete utxo ring bucket"
+		str := "failed to delete utxo ring bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if err := ns.DeleteNestedBucket(bucketRingDetails); err != nil {
-		str := "fialed to delete utxo details bucket"
+		str := "failed to delete utxo details bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 
@@ -2257,11 +2257,11 @@ func deleteBuckets(ns walletdb.ReadWriteBucket) error {
 	}
 
 	if err := ns.DeleteNestedBucket(bucketAUTPoint); err != nil {
-		str := "fialed to delete aut point bucket"
+		str := "failed to delete aut point bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 	if err := ns.DeleteNestedBucket(bucketBlockDisabledAUTPoint); err != nil {
-		str := "fialed to delete block disabled aut point bucket"
+		str := "failed to delete block disabled aut point bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 
