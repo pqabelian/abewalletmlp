@@ -97,6 +97,8 @@ var rpcHandlers = map[string]struct {
 	"keypoolrefill": {handler: keypoolRefill}, // TODO
 	//"listaccounts":           {handler: listAccounts},
 	"listlockunspent": {handler: listLockUnspent},
+	"lockunspent":     {handler: lockUnspent},
+
 	//"listreceivedbyaccount":  {handler: listReceivedByAccount},
 	//"listreceivedbyaddress":  {handler: listReceivedByAddress},
 	//"listsinceblock": {handlerWithChain: listSinceBlock},
@@ -118,7 +120,6 @@ var rpcHandlers = map[string]struct {
 	"listinvalidtxs":     {handler: listInvalidTxs},
 	"transactionstatus":  {handler: txStatus},
 
-	"lockunspent": {handler: lockUnspent},
 	//"sendfrom":               {handlerWithChain: sendFrom},
 	//"sendmany":               {handler: sendMany},
 	"gettxhashfromreqeust": {handler: getTxHashFromRequest},
@@ -457,9 +458,6 @@ func getInfo(icmd interface{}, w *wallet.Wallet, chainClient *chain.RPCClient) (
 	if err != nil {
 		return nil, err
 	}
-	if err != nil {
-		return nil, err
-	}
 
 	// TODO(davec): This should probably have a database version as opposed
 	// to using the manager version.
@@ -788,7 +786,7 @@ func listAllUTXOAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 			Amount:       unmatureds[i].Amount,
 			Height:       unmatureds[i].Height,
 			UTXOHash:     unmatureds[i].Hash(),
-			UTXOHashStr:  utxos[i].Hash().String(),
+			UTXOHashStr:  unmatureds[i].Hash().String(),
 		})
 	}
 	if !segment {

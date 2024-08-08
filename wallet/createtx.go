@@ -1324,6 +1324,11 @@ func (w *Wallet) createTransactionMLPByRootSeeds(
 		return nil, err
 	}
 
+	// adjust the order of output descs
+	sort.SliceStable(selectedUTXOs, func(i, j int) bool {
+		return !selectedUTXOs[i].IsPseudonymous() && selectedUTXOs[j].IsPseudonymous()
+	})
+
 	PrintConsumedUTXOs(selectedUTXOs)
 
 	if w.Manager.IsLocked() {
@@ -1423,6 +1428,7 @@ func (w *Wallet) createTransactionMLPByRootSeeds(
 
 		txOutDescs = append(txOutDescs, abecryptox.NewAbeTxOutDesc(addrBytes, uint64(currentTotal-txFee-targetValue)))
 	}
+	PrintNewUTXOs(txOutDescs, needChangeFlag, txFee)
 
 	if needChangeFlag && randomOutput {
 		// random the outputs
@@ -1449,7 +1455,6 @@ func (w *Wallet) createTransactionMLPByRootSeeds(
 		}
 		return false
 	})
-	PrintNewUTXOs(txOutDescs, needChangeFlag, txFee)
 
 	transferTx, err := abecryptox.TransferTxGenByRootSeeds(abeTxInputDescs, txOutDescs, transferTxTemplate)
 	if err != nil {

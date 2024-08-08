@@ -2839,7 +2839,7 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 					}
 					// mature/spendbutunmined/spentandconfirmed output -> immature output
 					// check in mature output
-					if output, err := fetchSpendableTXO(wtxmgrNs, outpoint.TxHash, outpoint.Index); err == nil {
+					if output, err := fetchSpendableTXO(wtxmgrNs, outpoint.TxHash, outpoint.Index); err == nil && output != nil {
 						amt := abeutil.Amount(output.Amount)
 						spendableBal -= amt
 						immatureTRBal += amt
@@ -2913,7 +2913,7 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 						continue
 					}
 					// check in unconfirmed output bucket
-					if output, err := fetchUnconfirmedTXO(wtxmgrNs, outpoint.TxHash, outpoint.Index); err == nil {
+					if output, err := fetchUnconfirmedTXO(wtxmgrNs, outpoint.TxHash, outpoint.Index); err == nil && output != nil {
 						amt := abeutil.Amount(output.Amount)
 						unconfirmedBal -= amt
 						immatureTRBal += amt
@@ -2990,21 +2990,11 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 							return err
 						}
 
-						trOutput[*outpoint] = &SpendableTXO{
-							Version:        output.Version,
-							Height:         output.Height,
-							TxOutput:       output.TxOutput,
-							PackedFlag:     output.PackedFlag,
-							Amount:         output.Amount,
-							GenerationTime: output.GenerationTime,
-							RingHash:       output.RingHash,
-							RingSize:       output.RingSize,
-							RingIndex:      output.RingIndex,
-						}
+						trOutput[*outpoint] = &output.SpendableTXO
 						continue
 					}
 					// check in unconfirmed output
-					if output, err := fetchConfirmedTXO(wtxmgrNs, outpoint.TxHash, outpoint.Index); err == nil {
+					if output, err := fetchConfirmedTXO(wtxmgrNs, outpoint.TxHash, outpoint.Index); err == nil && output != nil {
 						amt := abeutil.Amount(output.Amount)
 						immatureTRBal += amt
 						balance += amt
@@ -3099,20 +3089,10 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 						if err != nil {
 							return err
 						}
-						trOutput[*outpoint] = &SpendableTXO{
-							Version:        output.Version,
-							Height:         output.Height,
-							TxOutput:       output.TxOutput,
-							PackedFlag:     output.PackedFlag,
-							Amount:         output.Amount,
-							RingIndex:      output.RingIndex,
-							GenerationTime: output.GenerationTime,
-							RingHash:       output.RingHash,
-							RingSize:       output.RingSize,
-						}
+						trOutput[*outpoint] = &output.SpendableTXO
 					} else {
 						// something error in database
-						log.Errorf("rollback wrong in height %d with outpoint %s:%d", i, outpoint.TxHash, outpoint.Index)
+						log.Errorf("rollback wrong in height %d: can not find outpoint %s:%d in spendable/unconfirmed/confirmed txo bucket", i, outpoint.TxHash, outpoint.Index)
 					}
 				}
 				err = putImmatureCoinbaseOutput(wtxmgrNs, blockHeight, *blockHash, cbOutput)
