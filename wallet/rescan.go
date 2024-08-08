@@ -84,7 +84,7 @@ func (w *Wallet) rescanWithTarget(startStamp *waddrmgr.BlockStamp) error {
 					}
 
 					// have not reach the target start sync height
-					if currentHeight < w.SyncFrom {
+					if currentHeight < w.chainParams.BlockHeightMLPAUT || currentHeight < w.SyncFrom {
 						blockHeader, err := client.GetBlockHeader(hash)
 						if err != nil {
 							return err
