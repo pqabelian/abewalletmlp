@@ -1585,7 +1585,21 @@ func exportAddressKeyRandSeed(icmd interface{}, w *wallet.Wallet) (interface{}, 
 func generateAddressAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.GenerateAddressCmd)
 	number := *cmd.Num
-	privacyLevel := *cmd.PrivacyLevel
+	privacyLevel := abecryptoxkey.PrivacyLevel(*cmd.PrivacyLevel)
+
+	// sanity check
+	if number <= 0 {
+		return nil, errors.New("the first parameter is required to specify a positive integer")
+	}
+
+	if privacyLevel != abecryptoxkey.PrivacyLevelRINGCT &&
+		privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+		msg := "unsupported privacy level"
+		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre {
+			msg += ": addresses of the specified type can be created using abewalletlegacy"
+		}
+		return nil, errors.New(msg)
+	}
 
 	if w.Manager.IsLocked() {
 		return nil, errors.New("wallet is locked")
@@ -1598,7 +1612,7 @@ func generateAddressAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 	for i := 0; i < number; i++ {
 		var address []byte
 		var netID []byte
-		netID, address, err = w.NewAddressKey(abecryptoxkey.PrivacyLevel(privacyLevel))
+		netID, address, err = w.NewAddressKey(privacyLevel)
 		if err != nil {
 			return nil, err
 		}
