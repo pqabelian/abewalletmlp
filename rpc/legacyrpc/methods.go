@@ -982,7 +982,7 @@ func listAUTCoins(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		AUTIdentifier string
 		IsAUTRootCoin bool
 		AUTCoinValue  uint64
-		AddrKey       []byte
+		AddrKey       string
 		Spent         bool
 		UTXOHash      string
 	}
@@ -993,7 +993,7 @@ func listAUTCoins(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 			AUTIdentifier: string(autCoins[i].AUTIdentifier),
 			IsAUTRootCoin: autCoins[i].IsAUTRootCoin,
 			AUTCoinValue:  autCoins[i].AUTCoinValue,
-			AddrKey:       autCoins[i].AddrKey,
+			AddrKey:       hex.EncodeToString(autCoins[i].AddrKey),
 			Spent:         autCoins[i].Spent,
 		}
 
