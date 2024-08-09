@@ -827,7 +827,7 @@ func (w *Wallet) txPqringCTToOutputsMLP(txOutDescs []*abecryptox.AbeTxOutputDesc
 			currentTotal = currentTotal + abeutil.Amount(txo.Amount)
 		}
 		if currentTotal < targetValue {
-			return nil, errors.New("not enough amount to transfer: input < output")
+			return nil, fmt.Errorf("not enough amount to transfer: input (%d) < output(%d) + fee(%d) ", currentTotal, targetValue, txFee)
 		}
 		maxInputNum, err := abecryptoxparam.GetTxInputMaxNum(txVersion)
 		if err != nil {
@@ -863,7 +863,7 @@ func (w *Wallet) txPqringCTToOutputsMLP(txOutDescs []*abecryptox.AbeTxOutputDesc
 			return nil, err
 		}
 		if targetValue+fee > currentTotal {
-			return nil, errors.New("not enough amount to transfer: input + fee < output ")
+			return nil, fmt.Errorf("not enough amount to transfer: input (%d) < output(%d) + fee(%d) ", currentTotal, targetValue, txFee)
 		}
 		if currentTotal >= targetValue+fee+ChangeThreshold {
 			// need to make a change
@@ -876,7 +876,7 @@ func (w *Wallet) txPqringCTToOutputsMLP(txOutDescs []*abecryptox.AbeTxOutputDesc
 	}
 
 	if targetValue+txFee > currentTotal {
-		return nil, errors.New("not enough amount to transfer: input + fee < output ")
+		return nil, fmt.Errorf("not enough amount to transfer: input (%d) < output(%d) + fee(%d) ", currentTotal, targetValue, txFee)
 	}
 
 	selectedRings := make(map[chainhash.Hash]*wtxmgr.Ring)
@@ -1414,7 +1414,7 @@ func (w *Wallet) createTransactionMLPByRootSeeds(
 		targetValue += abeutil.Amount(output.Value())
 	}
 	if targetValue+txFee > currentTotal {
-		return nil, errors.New("not enough amount to transfer: input + fee < output ")
+		return nil, fmt.Errorf("not enough amount to transfer: input (%d) < output(%d) + fee(%d) ", currentTotal, targetValue, txFee)
 	}
 
 	usedCntNum := ^uint64(0)
@@ -1458,6 +1458,7 @@ func (w *Wallet) createTransactionMLPByRootSeeds(
 
 	transferTx, err := abecryptox.TransferTxGenByRootSeeds(abeTxInputDescs, txOutDescs, transferTxTemplate)
 	if err != nil {
+		log.Errorf("fail to generate transaction: %v", err)
 		return nil, err
 	}
 	resTx := &txauthor.AuthoredTxAbe{

@@ -1681,7 +1681,7 @@ func sendToAddressesAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 	}
 
 	var utxoSpecified []string = nil
-	if cmd.UTXOSpecified != nil {
+	if cmd.UTXOSpecified != nil && *cmd.UTXOSpecified != "" {
 		utxoSpecified = strings.Split(*cmd.UTXOSpecified, ",")
 		utxoNum := len(utxoSpecified)
 		for i := 0; i < utxoNum; i++ {
