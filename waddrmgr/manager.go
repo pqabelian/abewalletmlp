@@ -16,7 +16,6 @@ import (
 	"github.com/abesuite/abewalletmlp/internal/zero"
 	"github.com/abesuite/abewalletmlp/snacl"
 	"github.com/abesuite/abewalletmlp/walletdb"
-	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/sha3"
 	"sync"
 	"time"
@@ -1480,15 +1479,31 @@ func generateAddressSKForPQRingCT(cryptoScheme abecryptoxparam.CryptoScheme, pri
 	return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, nil, err
 }
 
-func deriveKey(password string, salt []byte) []byte {
-	return argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, abecryptoutils.PRFKeyBytesLen)
+func deriveSeed(key []byte, input string) ([]byte, error) {
+	return KDF(key, []byte(input))
 }
 
 func generateRootSeedForPQRingCTX(originSeed []byte) ([]byte, []byte, []byte, []byte, error) {
-	coinSpendKeyRootSeed := deriveKey("spendkey", originSeed)
-	coinSerialNumberKeyRootSeed := deriveKey("serialnumberkey", originSeed)
-	coinValueKeyRootSeed := deriveKey("valuekey", originSeed)
-	coinDetectorRootKey := deriveKey("detectorkey", originSeed)
+	coinSpendKeyRootSeed, err := deriveSeed(originSeed, "spendkey")
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	coinSerialNumberKeyRootSeed, err := deriveSeed(originSeed, "serialnumberkey")
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	coinValueKeyRootSeed, err := deriveSeed(originSeed, "valuekey")
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	coinDetectorRootKey, err := deriveSeed(originSeed, "detectorkey")
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	fmt.Printf("%x\n", coinSpendKeyRootSeed)
+	fmt.Printf("%x\n", coinSerialNumberKeyRootSeed)
+	fmt.Printf("%x\n", coinValueKeyRootSeed)
+	fmt.Printf("%x\n", coinDetectorRootKey)
 
 	return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, nil
 }
