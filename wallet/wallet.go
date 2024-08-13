@@ -1527,10 +1527,12 @@ func (w *Wallet) NewAddressKey(privacyLevel abecryptoxkey.PrivacyLevel) ([]byte,
 	err := walletdb.Update(w.db, func(tx walletdb.ReadWriteTx) error {
 		var err error
 		addrmgrNs := tx.ReadWriteBucket(waddrmgrNamespaceKey)
-		netID, err = w.Manager.FetchNetID(addrmgrNs)
+		netIDInDB, err := w.Manager.FetchNetID(addrmgrNs)
 		if err != nil {
 			return err
 		}
+		netID = make([]byte, len(netIDInDB))
+		copy(netID, netIDInDB)
 
 		cryptoAddress, _, _, _, _, _, err = w.Manager.GenerateAddressKeys(addrmgrNs, privacyLevel)
 		if err != nil {

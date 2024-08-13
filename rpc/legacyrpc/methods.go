@@ -1605,34 +1605,24 @@ func generateAddressAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 		return nil, errors.New("wallet is locked")
 	}
 
-	var err error
-	numberOrder := make([]uint64, number)
-	addresses := make([][]byte, number)
-
-	for i := 0; i < number; i++ {
-		var address []byte
-		var netID []byte
-		netID, address, err = w.NewAddressKey(privacyLevel)
-		if err != nil {
-			return nil, err
-		}
-		addresses[i] = make([]byte, len(netID)+len(address)+32)
-		// TODO: How to know the active net?
-		copy(addresses[i][:len(netID)], netID)
-		copy(addresses[i][len(netID):], address)
-		// generate the hash of (abecrypto.CryptoSchemePQRINGCT || serialized address)
-		hash := chainhash.DoubleHashB(addresses[i][:len(address)+len(netID)])
-		copy(addresses[i][len(address)+len(netID):], hash[:])
-	}
 	type tt struct {
 		No_  uint64 `json:"No,omitempty"`
 		Addr string `json:"addr,omitempty"`
 	}
 	res := make([]*tt, number)
 	for i := 0; i < number; i++ {
+		netID, address, err := w.NewAddressKey(privacyLevel)
+		if err != nil {
+			return nil, err
+		}
+		tmpAddress := make([]byte, 0, len(netID)+len(address)+32)
+		tmpAddress = append(tmpAddress, netID...)
+		tmpAddress = append(tmpAddress, address...)
+		// generate the hash of (abecrypto.CryptoSchemePQRINGCT || serialized address)
+		hash := chainhash.DoubleHashB(tmpAddress[:len(address)+len(netID)])
+		tmpAddress = append(tmpAddress, hash[:]...)
 		res[i] = &tt{
-			No_:  numberOrder[i],
-			Addr: hex.EncodeToString(addresses[i]),
+			Addr: hex.EncodeToString(tmpAddress),
 		}
 	}
 	return res, nil
