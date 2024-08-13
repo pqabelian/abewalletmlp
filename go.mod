@@ -3,9 +3,8 @@ module github.com/abesuite/abewalletmlp
 go 1.14
 
 require (
-	github.com/abesuite/abec v1.0.0
+	github.com/abesuite/abec v1.0.1-0.20240812072406-02b5619f37b4
 	github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd
-	github.com/bits-and-blooms/bitset v1.8.0
 	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/websocket v1.4.2
 	github.com/jessevdk/go-flags v1.4.0
