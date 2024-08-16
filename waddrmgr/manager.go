@@ -1500,10 +1500,6 @@ func generateRootSeedForPQRingCTX(originSeed []byte) ([]byte, []byte, []byte, []
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	fmt.Printf("%x\n", coinSpendKeyRootSeed)
-	fmt.Printf("%x\n", coinSerialNumberKeyRootSeed)
-	fmt.Printf("%x\n", coinValueKeyRootSeed)
-	fmt.Printf("%x\n", coinDetectorRootKey)
 
 	return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, nil
 }
