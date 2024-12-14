@@ -96,7 +96,8 @@ func (l *Loader) RunAfterLoad(fn func(*Wallet)) {
 // this seed.  If nil, a secure random seed is generated.
 
 func (l *Loader) CreateNewWallet(cryptoScheme abecryptoxparam.CryptoScheme,
-	pubPassphrase, privPassphrase, seed []byte, bday time.Time, isWatchingOnly bool) (*Wallet, error) {
+	pubPassphrase, privPassphrase, masterSeed []byte, fromCLIWallet bool, CLIWalletVersion string,
+	bday time.Time, isWatchingOnly bool) (*Wallet, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -137,7 +138,7 @@ func (l *Loader) CreateNewWallet(cryptoScheme abecryptoxparam.CryptoScheme,
 	// 4. create transaction manager based on the created transaction bucket
 	// 4.1 populate version, create date and balance
 	// 4.2 populate data bucket for block, transaction, output, aut
-	err = Create(db, cryptoScheme, pubPassphrase, privPassphrase, seed, l.chainParams, bday, isWatchingOnly)
+	err = Create(db, cryptoScheme, pubPassphrase, privPassphrase, masterSeed, fromCLIWallet, CLIWalletVersion, l.chainParams, bday, isWatchingOnly)
 	if err != nil {
 		return nil, err
 	}

@@ -244,12 +244,12 @@ func PrivacyLevel(reader *bufio.Reader, scheme abecryptoxparam.CryptoScheme) (ab
 // the user along with prompting them for confirmation.  When the user answers
 // yes, a the user is prompted for it.  All prompts are repeated until the user
 // enters a valid response.
-func Seed(reader *bufio.Reader) (abecryptoxparam.CryptoScheme, []byte, error) {
+func Seed(reader *bufio.Reader, fromCLIWallet bool, CLIWalletVersion string) (abecryptoxparam.CryptoScheme, []byte, bool, error) {
 	// Ascertain the wallet generation seed.
 	useUserSeed, err := promptListBool(reader, "Do you have an "+
 		"existing wallet seed you want to use?", "no")
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, false, err
 	}
 
 	// When user do not have any seed, generate one and use the latest crypto scheme as default
@@ -269,17 +269,17 @@ func Seed(reader *bufio.Reader) (abecryptoxparam.CryptoScheme, []byte, error) {
 		cryptoScheme := abecryptoxparam.CryptoSchemePQRingCTX
 		entropy, err := NewEntropy(SeedLength)
 		if err != nil {
-			return 0, nil, errors.New("fail to generate entropy")
+			return 0, nil, false, errors.New("fail to generate entropy")
 		}
 
 		mnemonics, err := EntropyToWords(cryptoScheme, entropy, nil)
 		if err != nil {
-			return 0, nil, errors.New("fail to convert entropy to mnemonic")
+			return 0, nil, false, errors.New("fail to convert entropy to mnemonic")
 		}
 
-		seed, err := WordsToSeed(cryptoScheme, mnemonics, nil)
+		masterSeed, err := WordsToMasterSeed(cryptoScheme, false, "", mnemonics, nil)
 		if err != nil {
-			return 0, nil, errors.New("fail to generate seed")
+			return 0, nil, false, errors.New("fail to generate seed")
 		}
 
 		// Ascertain the wallet privacy level.
@@ -289,7 +289,7 @@ func Seed(reader *bufio.Reader) (abecryptoxparam.CryptoScheme, []byte, error) {
 		//}
 
 		fmt.Println("Your wallet's generation seed is: ")
-		fmt.Printf("%x\n", seed)
+		fmt.Printf("%x\n", masterSeed)
 		fmt.Println("Your wallet's crypto version is: ", cryptoScheme)
 		//fmt.Println("Your wallet's privacy level is: ", privacyLevel)
 		fmt.Println("Your wallet's mnemonic list is: ")
@@ -306,7 +306,7 @@ func Seed(reader *bufio.Reader) (abecryptoxparam.CryptoScheme, []byte, error) {
 				`and secure location, enter "OK" to continue: `)
 			confirmSeed, err := reader.ReadString('\n')
 			if err != nil {
-				return 0, nil, err
+				return 0, nil, false, err
 			}
 			confirmSeed = strings.TrimSpace(confirmSeed)
 			confirmSeed = strings.Trim(confirmSeed, `"`)
@@ -315,12 +315,12 @@ func Seed(reader *bufio.Reader) (abecryptoxparam.CryptoScheme, []byte, error) {
 			}
 		}
 
-		return cryptoScheme, seed, nil
+		return cryptoScheme, masterSeed, false, nil
 	}
 
 	// recovery mode
 	var cryptoScheme abecryptoxparam.CryptoScheme
-	var seed []byte
+	var masterSeed []byte
 	for {
 		fmt.Print("Enter the crypto version:")
 		cryptoSchemeStr, err := reader.ReadString('\n')
@@ -333,23 +333,23 @@ func Seed(reader *bufio.Reader) (abecryptoxparam.CryptoScheme, []byte, error) {
 		cryptoScheme = abecryptoxparam.CryptoScheme(cryptoSchemeInt)
 		if cryptoScheme != abecryptoxparam.CryptoSchemePQRingCTX {
 			if cryptoScheme == abecryptoxparam.CryptoSchemePQRingCT {
-				return 0, nil, fmt.Errorf("crypto version %d is supported by another wallet named abewalletlegacy", cryptoScheme)
+				return 0, nil, true, fmt.Errorf("crypto version %d is supported by another wallet named abewalletlegacy", cryptoScheme)
 			}
-			return 0, nil, errors.New("unsupported crypto scheme in current wallet version")
+			return 0, nil, true, errors.New("unsupported crypto scheme in current wallet version")
 		}
 
 		fmt.Print("Enter existing wallet mnemonic: ")
 		mnemonicWords, err := reader.ReadString('\n')
 		if err != nil {
-			return 0, nil, err
+			return 0, nil, true, err
 		}
 		mnemonicWords = strings.TrimSpace(strings.ToLower(mnemonicWords))
 		mnemonics := strings.Split(mnemonicWords, ",")
-		seed, err = WordsToSeed(cryptoScheme, mnemonics, wordlists.EnglishMap)
+		masterSeed, err = WordsToMasterSeed(cryptoScheme, fromCLIWallet, CLIWalletVersion, mnemonics, wordlists.EnglishMap)
 		if err != nil {
-			return 0, nil, err
+			return 0, nil, true, err
 		}
 
-		return cryptoScheme, seed, nil
+		return cryptoScheme, masterSeed, true, nil
 	}
 }

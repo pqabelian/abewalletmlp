@@ -2014,19 +2014,19 @@ func (w *Wallet) GetTxHashRequestHash(requestHash string) (res map[string]interf
 // seed is non-nil, it is used.  Otherwise, a secure random seed of the
 // recommended length is generated.
 func Create(db walletdb.DB, cryptoScheme abecryptoxparam.CryptoScheme,
-	pubPass, privPass, seed []byte, params *chaincfg.Params, birthday time.Time, isWatchingOnly bool) error {
+	pubPass, privPass, masterSeed []byte, fromCLIWallet bool, CLIWalletVersion string, params *chaincfg.Params, birthday time.Time, isWatchingOnly bool) error {
 	// TODO: the following snippet is not run?
 	if !isWatchingOnly {
 		// If a seed was provided, ensure that it is of valid length. Otherwise,
 		// we generate a random seed for the wallet with the recommended seed
 		// length.
 		// TODO(abe,20210619): this code snippet seems to not run forever?
-		if seed == nil {
+		if masterSeed == nil {
 			//	todo(ABE.MUST): the generation of the seed
 			//	How does ABE generates the seed? By outputting the seed in the process of generating MPK.
 			//	Or generating
-			seed = make([]byte, prompt.SeedLength)
-			_, err := rand.Read(seed[:])
+			masterSeed = make([]byte, prompt.SeedLength)
+			_, err := rand.Read(masterSeed[:])
 			if err != nil {
 				str := "failed to read random source"
 				return errors.New(str)
@@ -2045,7 +2045,7 @@ func Create(db walletdb.DB, cryptoScheme abecryptoxparam.CryptoScheme,
 		}
 
 		err = waddrmgr.Create(
-			cryptoScheme, addrmgrNs, seed, pubPass, privPass, params, nil, birthday,
+			cryptoScheme, addrmgrNs, masterSeed, fromCLIWallet, CLIWalletVersion, pubPass, privPass, params, nil, birthday,
 		)
 		if err != nil {
 			return err

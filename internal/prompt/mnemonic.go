@@ -5,14 +5,24 @@ import (
 	"errors"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abewalletmlp/wordlists"
+	"github.com/pqabelian/abelian-aip11-go"
 	"github.com/tyler-smith/go-bip39"
+	aip11wordlists "github.com/tyler-smith/go-bip39/wordlists"
 	"strings"
 )
 
 const MnemonicNum = 24
 
 func NewEntropy(length int) ([]byte, error) {
-	return bip39.NewEntropy(length * 8)
+	entropySeed, err := aip11.SampleEntropySeed()
+	if err != nil {
+		return nil, err
+	}
+	if len(entropySeed) != length {
+		return nil, errors.New("invalid entropy length")
+	}
+	return entropySeed, nil
 }
 
 // EntropyToWords convert entropy to mnemonic list
@@ -26,11 +36,10 @@ func EntropyToWords(cryptoScheme abecryptoxparam.CryptoScheme, entropy []byte, w
 		return seedToWords(entropy, wordlist)
 	}
 
-	mnemonics, err := bip39.NewMnemonic(entropy)
-	if err != nil {
-		return nil, err
+	if wordlist == nil {
+		wordlist = aip11wordlists.English
 	}
-	return strings.Split(mnemonics, " "), nil
+	return aip11.EntropySeedToMnemonic(entropy, wordlist)
 }
 
 func WordsToEntropy(cryptoScheme abecryptoxparam.CryptoScheme, mnemonics []string, wordMap map[string]int) ([]byte, error) {
@@ -40,14 +49,41 @@ func WordsToEntropy(cryptoScheme abecryptoxparam.CryptoScheme, mnemonics []strin
 	if cryptoScheme == abecryptoxparam.CryptoSchemePQRingCT {
 		return wordsToSeed(mnemonics, wordMap)
 	}
-	if valid := bip39.IsMnemonicValid(strings.Join(mnemonics, " ")); !valid {
-		return nil, errors.New("invalid mnemonic list")
+	return aip11.MnemonicToEntropySeed(mnemonics, aip11wordlists.English)
+}
+
+func EntropyToMasterSeed(cryptoScheme abecryptoxparam.CryptoScheme, entropy []byte) ([]byte, error) {
+	if cryptoScheme != abecryptoxparam.CryptoSchemePQRingCT && cryptoScheme != abecryptoxparam.CryptoSchemePQRingCTX {
+		return nil, errors.New("unsupported crypto scheme")
 	}
-	entropy, err := bip39.EntropyFromMnemonic(strings.Join(mnemonics, " "))
+	if cryptoScheme == abecryptoxparam.CryptoSchemePQRingCT {
+		return entropy, nil
+	}
+	return aip11.EntropySeedToMasterSeed(entropy, []byte{}) // default use empty context
+}
+
+func WordsToMasterSeed(cryptoScheme abecryptoxparam.CryptoScheme, fromCLIWallet bool, CLIWalletVersion string,
+	mnemonics []string, wordMap map[string]int) ([]byte, error) {
+	if cryptoScheme != abecryptoxparam.CryptoSchemePQRingCT && cryptoScheme != abecryptoxparam.CryptoSchemePQRingCTX {
+		return nil, errors.New("unsupported crypto scheme")
+	}
+	if cryptoScheme == abecryptoxparam.CryptoSchemePQRingCT {
+		return wordsToSeed(mnemonics, wordMap)
+	}
+
+	if fromCLIWallet && strings.HasPrefix(CLIWalletVersion, "1") {
+		masterSeed, err := WordsToSeed(cryptoScheme, mnemonics, wordlists.EnglishMap)
+		if err != nil {
+			return nil, err
+		}
+		return masterSeed, nil
+	}
+
+	entropySeed, err := aip11.MnemonicToEntropySeed(mnemonics, aip11wordlists.English)
 	if err != nil {
 		return nil, err
 	}
-	return entropy, nil
+	return aip11.EntropySeedToMasterSeed(entropySeed, []byte{}) // default use empty context
 }
 
 // SeedToWords

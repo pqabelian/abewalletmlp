@@ -686,7 +686,7 @@ func (s *loaderServer) CreateWalletAbe(ctx context.Context, req *pb.CreateWallet
 
 	createdWallet, err := s.loader.CreateNewWallet(
 		abecryptoxparam.CryptoSchemePQRingCTX,
-		pubPassphrase, req.PrivatePassphrase, req.Seed, time.Now(), true)
+		pubPassphrase, req.PrivatePassphrase, req.Seed, false, "", time.Now(), true)
 	if err != nil {
 		return nil, translateError(err)
 	}

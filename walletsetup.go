@@ -50,7 +50,9 @@ func createWallet(cfg *config) error {
 
 	var cryptoScheme abecryptoxparam.CryptoScheme
 	var pubPass, privPass []byte
-	var seed []byte
+	var masterSeed []byte
+	var useMnemonics bool
+	var fromCLIWallet bool
 	var err error
 	// When there is a legacy keystore, open it now to ensure any errors
 	// don't end up exiting the process after the user has spent time
@@ -76,9 +78,13 @@ func createWallet(cfg *config) error {
 		// Ascertain the wallet generation seed.  This will either be an
 		// automatically generated value the user has already confirmed or a
 		// value the user has entered which has already been validated.
-		cryptoScheme, seed, err = prompt.Seed(reader)
+		cryptoScheme, masterSeed, useMnemonics, err = prompt.Seed(reader, cfg.FromCLIWallet, cfg.CLIWalletVersion)
 		if err != nil {
 			return err
+		}
+		// if user does not provide mnemonic, from cli wallet would be false
+		if useMnemonics {
+			fromCLIWallet = cfg.FromCLIWallet
 		}
 	} else if cfg.NonInteractiveCreate {
 		// try to read from config
@@ -106,16 +112,18 @@ func createWallet(cfg *config) error {
 				return err
 			}
 		} else {
+			useMnemonics = true
+			fromCLIWallet = cfg.FromCLIWallet
 			mnemonics = strings.Split(cfg.MyMnemonic, ",")
 		}
-		seed, err = prompt.WordsToSeed(cryptoScheme, mnemonics, wordlists.EnglishMap)
+		masterSeed, err = prompt.WordsToMasterSeed(cryptoScheme, fromCLIWallet, cfg.CLIWalletVersion, mnemonics, wordlists.EnglishMap)
 		if err != nil {
 			return err
 		}
 
-		fmt.Println(cryptoScheme)
-		fmt.Printf("%x\n", seed)
-		fmt.Printf("%v\n", strings.Join(mnemonics, ","))
+		if !useMnemonics {
+			fmt.Printf("%v\n", strings.Join(mnemonics, ","))
+		}
 		if cfg.MyWalletPass == "" {
 			cfg.MyWalletPass = wallet.InsecurePubPassphrase
 		}
@@ -124,7 +132,7 @@ func createWallet(cfg *config) error {
 	}
 
 	fmt.Println("Creating the wallet...")
-	w, err := loader.CreateNewWallet(cryptoScheme, pubPass, privPass, seed, time.Now(), true)
+	w, err := loader.CreateNewWallet(cryptoScheme, pubPass, privPass, masterSeed, fromCLIWallet, cfg.CLIWalletVersion, time.Now(), true)
 	if err != nil {
 		return err
 	}
@@ -157,7 +165,7 @@ func createSimulationWallet(cfg *config) error {
 	defer db.Close()
 
 	// Create the wallet.
-	err = wallet.Create(db, abecryptoxparam.CryptoSchemePQRingCTX, pubPass, privPass, nil, activeNet.Params, time.Now(), false)
+	err = wallet.Create(db, abecryptoxparam.CryptoSchemePQRingCTX, pubPass, privPass, nil, false, "", activeNet.Params, time.Now(), false)
 	if err != nil {
 		return err
 	}

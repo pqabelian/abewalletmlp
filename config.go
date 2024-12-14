@@ -112,6 +112,9 @@ type config struct {
 	// Options using the No.0 address as the change address
 	ChangeWithInitialAddress bool `long:"changewithinitialaddress" description:"use the No.0 address as the change address"`
 
+	FromCLIWallet    bool   `long:"fromcliwallet" description:"use mnemonic list from cli-abewalletmlp to derive account seeds"`
+	CLIWalletVersion string `long:"cliwalletversion" description:"use mnemonic list from cli-abewalletmlp with specified version to derive account seeds"`
+
 	// Options that are used when creating wallet in non-interactive mode
 	NonInteractiveCreate bool   `long:"noninteractivecreate" description:"Create a wallet in non-interactive mode, just using command line args"`
 	WithMnemonic         bool   `long:"withmnemonic" description:"Whether or not the args containing wallet mnemonic"`

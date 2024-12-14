@@ -16,6 +16,7 @@ import (
 	"github.com/abesuite/abewalletmlp/internal/zero"
 	"github.com/abesuite/abewalletmlp/snacl"
 	"github.com/abesuite/abewalletmlp/walletdb"
+	aip11 "github.com/pqabelian/abelian-aip11-go"
 	"golang.org/x/crypto/sha3"
 	"sync"
 	"time"
@@ -1233,7 +1234,7 @@ func Open(ns walletdb.ReadBucket, pubPassphrase []byte,
 // pubpassphrase -> masterkeypub     | [cryptoKeyPub -> 				 masterPubKey]
 
 func Create(cryptoScheme abecryptoxparam.CryptoScheme,
-	ns walletdb.ReadWriteBucket, originSeed, pubPassphrase, privPassphrase []byte,
+	ns walletdb.ReadWriteBucket, masterSeed []byte, fromCLIWallet bool, CLIWalletVersion string, pubPassphrase, privPassphrase []byte,
 	chainParams *chaincfg.Params, config *ScryptOptions, birthday time.Time) error {
 
 	// assert
@@ -1242,7 +1243,7 @@ func Create(cryptoScheme abecryptoxparam.CryptoScheme,
 	}
 
 	// If the originSeed argument is nil we create in watchingOnly mode.
-	isWatchingOnly := originSeed == nil
+	isWatchingOnly := masterSeed == nil
 
 	// Return an error if the manager has already been created in
 	// the given database namespace.
@@ -1349,7 +1350,7 @@ func Create(cryptoScheme abecryptoxparam.CryptoScheme,
 			return managerError(ErrCrypto, str, err)
 		}
 
-		coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, err := generateRootSeedForPQRingCTX(originSeed)
+		coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, err := generateAccountRootSeedsForPQRingCTX(masterSeed, fromCLIWallet, CLIWalletVersion)
 
 		coinSpKeyRootSeedEnc, err := cryptoKeySeed.Encrypt(coinSpendKeyRootSeed)
 		if err != nil {
@@ -1483,23 +1484,75 @@ func deriveSeed(key []byte, input string) ([]byte, error) {
 	return KDF(key, []byte(input))
 }
 
-func generateRootSeedForPQRingCTX(originSeed []byte) ([]byte, []byte, []byte, []byte, error) {
-	coinSpendKeyRootSeed, err := deriveSeed(originSeed, "spendkey")
+func generateAccountRootSeedsForPQRingCTX(masterSeed []byte, fromCLIWallet bool, CLIWalletVersion string) ([]byte, []byte, []byte, []byte, error) {
+	if fromCLIWallet {
+		if CLIWalletVersion == "1.0.0" {
+			shake256 := sha3.NewShake256()
+
+			coinSpendKeyRootSeed := make([]byte, abecryptoutils.PRFKeyBytesLen)
+			shake256.Reset()
+			tmp := []byte{'s', 'p', 'e', 'n', 'd'}
+			tmp = append(tmp, masterSeed...)
+			shake256.Write(tmp)
+			shake256.Read(coinSpendKeyRootSeed)
+
+			coinSerialNumberKeyRootSeed := make([]byte, abecryptoutils.PRFKeyBytesLen)
+			shake256.Reset()
+			tmp = []byte{'s', 'e', 'r', 'i', 'a', 'l'}
+			tmp = append(tmp, masterSeed...)
+			shake256.Write(tmp)
+			shake256.Read(coinSerialNumberKeyRootSeed)
+
+			coinValueKeyRootSeed := make([]byte, abecryptoutils.PRFKeyBytesLen)
+			shake256.Reset()
+			tmp = []byte{'v', 'a', 'l', 'u', 'e'}
+			tmp = append(tmp, masterSeed...)
+			shake256.Write(tmp)
+			shake256.Read(coinValueKeyRootSeed)
+
+			coinDetectorRootKey := make([]byte, abecryptoutils.PRFKeyBytesLen)
+			shake256.Reset()
+			tmp = []byte{'d', 'e', 't', 'e', 'c', 't'}
+			tmp = append(tmp, masterSeed...)
+			shake256.Write(tmp)
+			shake256.Read(coinDetectorRootKey)
+
+			return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, nil
+		} else if CLIWalletVersion == "1.0.1" {
+			coinSpendKeyRootSeed, err := deriveSeed(masterSeed, "spendkey")
+			if err != nil {
+				return nil, nil, nil, nil, err
+			}
+			coinSerialNumberKeyRootSeed, err := deriveSeed(masterSeed, "serialnumberkey")
+			if err != nil {
+				return nil, nil, nil, nil, err
+			}
+			coinValueKeyRootSeed, err := deriveSeed(masterSeed, "valuekey")
+			if err != nil {
+				return nil, nil, nil, nil, err
+			}
+			coinDetectorRootKey, err := deriveSeed(masterSeed, "detectorkey")
+			if err != nil {
+				return nil, nil, nil, nil, err
+			}
+
+			return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, nil
+		}
+	}
+
+	// follow aip-0011
+	accountRootSeeds, err := aip11.MasterSeedToAccountRootSeeds(masterSeed)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	coinSerialNumberKeyRootSeed, err := deriveSeed(originSeed, "serialnumberkey")
-	if err != nil {
-		return nil, nil, nil, nil, err
+	// assert
+	if len(accountRootSeeds) != 4 {
+		return nil, nil, nil, nil, errors.New("fail to generate account seed")
 	}
-	coinValueKeyRootSeed, err := deriveSeed(originSeed, "valuekey")
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	coinDetectorRootKey, err := deriveSeed(originSeed, "detectorkey")
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
+	coinSpendKeyRootSeed := accountRootSeeds[0]
+	coinSerialNumberKeyRootSeed := accountRootSeeds[1]
+	coinValueKeyRootSeed := accountRootSeeds[3]
+	coinDetectorRootKey := accountRootSeeds[2]
 
 	return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, nil
 }
