@@ -3979,6 +3979,55 @@ func (s *Store) UnspentOutputsAUT(ns walletdb.ReadBucket, autIdentifier []byte, 
 	return autCoins, utxos, nil
 }
 
+func (s *Store) AddressAUTCoins(ns walletdb.ReadBucket, autIdentifier []byte, addrKey []byte) ([]*AUTCoin, []*SpendableTXO, error) {
+	autCoins := make([]*AUTCoin, 0)
+
+	var op wire.OutPointAbe
+	autEntryBucket := ns.NestedReadBucket(bucketAUTPoint)
+
+	if autEntryBucket == nil {
+		return nil, nil, errors.New("non-exist bucket for aut point")
+	}
+	err := autEntryBucket.ForEach(func(k, v []byte) error {
+		err := readCanonicalOutPointAbe(k, &op)
+		if err != nil {
+			return err
+		}
+		ust := new(AUTCoin)
+		err = ust.Deserialize(&op, v)
+		if err != nil {
+			return err
+		}
+
+		if len(autIdentifier) != 0 && !bytes.Equal(ust.AUTIdentifier, autIdentifier) {
+			return nil
+		}
+		if !bytes.Equal(ust.AddrKey, addrKey) {
+			return nil
+		}
+
+		autCoins = append(autCoins, ust)
+		return nil
+	})
+	if err != nil {
+		if _, ok := err.(Error); ok {
+			return nil, nil, err
+		}
+		str := "failed iterating aut point bucket"
+		return nil, nil, storeError(ErrDatabase, str, err)
+	}
+
+	utxos := make([]*SpendableTXO, len(autCoins))
+	for i, coin := range autCoins {
+		txo, err := fetchSpendableTXO(ns, coin.TxOutput.TxHash, coin.TxOutput.Index)
+		if err != nil {
+			return nil, nil, err
+		}
+		utxos[i] = txo
+	}
+	return autCoins, utxos, nil
+}
+
 // Balance returns the spendable wallet balance (total value of all unspent
 // transaction outputs) given a minimum of minConf confirmations, calculated
 // at a current chain height of curHeight.  Coinbase outputs are only included

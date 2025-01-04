@@ -1007,6 +1007,7 @@ func (w *Wallet) txPqringCTToOutputsMLPAUT(autTransaction aut.Transaction, txOut
 		if err != nil {
 			return nil, err
 		}
+
 		if len(eligibleAUT) == 0 {
 			return nil, errors.New("not enough AUT coin to spend")
 		}

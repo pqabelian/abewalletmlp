@@ -111,8 +111,6 @@ var rpcHandlers = map[string]struct {
 	"listunconfirmedtxoabe":    {handler: listSpentButUnminedAbe},
 	"listconfirmedtxoabe":      {handler: listSpentAndMinedAbe},
 
-	"listautcoins": {handler: listAUTCoins},
-
 	"rangespendableutxo": {handler: rangeSpendableUTXOAbe},
 
 	"listunconfirmedtxs": {handler: listUnconfirmedTxs},
@@ -126,11 +124,16 @@ var rpcHandlers = map[string]struct {
 
 	"sendtoaddressesabe": {handler: sendToAddressesAbe},
 
+	"listautcoins": {handler: listAUTCoins},
+
 	"registeraut":   {handler: registerAUTTransaction},
 	"mintaut":       {handler: mintAUTTransaction},
 	"transferaut":   {handler: transferAUT},
 	"reregisteraut": {handler: reRegisterAUTTransaction},
 	"burnaut":       {handler: burnAUTTransaction},
+
+	"getautbalance":  {handler: getAUTBalance},
+	"burnautbalance": {handler: burnAUTBalance},
 
 	"generateaddressabe":       {handler: generateAddressAbe},
 	"addressmaxsequencenumber": {handler: addressMaxSequenceNumber},
@@ -1004,7 +1007,100 @@ func listAUTCoins(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 
 	return res, nil
 }
+func getAUTBalance(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+	cmd := icmd.(*abejson.GetAUTBalanceCmd)
 
+	if cmd.AUTIdentifier == "" {
+		return nil, errors.New("invalid identifier")
+	}
+	if len(cmd.AUTIdentifier) != aut.IdentifierLength {
+		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d", aut.IdentifierLength, len(cmd.AUTIdentifier))
+	}
+	autIdentifier := []byte(cmd.AUTIdentifier)
+
+	abelAddress, err := hex.DecodeString(cmd.Address)
+	if err != nil {
+		return nil, errors.New("invalid address")
+	}
+
+	err = checkValidAddress(abelAddress, w.ChainParams())
+	if err != nil {
+		return nil, err
+	}
+
+	coins, utxos, err := w.FetchAddressAUTCoins(autIdentifier, abelAddress[1:len(abelAddress)-32])
+	if err != nil {
+		return nil, err
+	}
+
+	var balance uint64
+	for i := 0; i < len(coins); i++ {
+		if utxos[i] != nil {
+			balance += coins[i].AUTCoinValue
+		}
+	}
+
+	type result struct {
+		Balance uint64 `json:"balance"`
+	}
+
+	return result{Balance: balance}, err
+}
+
+func burnAUTBalance(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+	cmd := icmd.(*abejson.BurnAUTBalanceCmd)
+
+	if cmd.AUTIdentifier == "" {
+		return nil, errors.New("invalid identifier")
+	}
+	if len(cmd.AUTIdentifier) != aut.IdentifierLength {
+		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d", aut.IdentifierLength, len(cmd.AUTIdentifier))
+	}
+	autIdentifier := []byte(cmd.AUTIdentifier)
+
+	abelAddress, err := hex.DecodeString(cmd.Address)
+	if err != nil {
+		return nil, errors.New("invalid address")
+	}
+	err = checkValidAddress(abelAddress, w.ChainParams())
+	if err != nil {
+		return nil, err
+	}
+
+	coins, utxos, err := w.FetchAddressAUTCoins(autIdentifier, abelAddress[1:len(abelAddress)-32])
+	if err != nil {
+		return nil, err
+	}
+
+	utxosSpecified := make([]string, 0, len(coins))
+	for i := 0; i < len(coins); i++ {
+		if coins[i].IsAUTRootCoin {
+			continue
+		}
+		if utxos[i] != nil {
+			utxosSpecified = append(utxosSpecified, utxos[i].UTXOHash.String())
+		}
+	}
+
+	if len(utxosSpecified) == 0 {
+		return nil, errors.New("no spendable token can be burned")
+	}
+
+	existUTXO := map[string]struct{}{}
+	for i := 0; i < len(utxosSpecified); i++ {
+		if _, ok := existUTXO[utxosSpecified[i]]; ok {
+			return nil, errors.New("specified utxos must be unique to each other")
+		}
+		existUTXO[utxosSpecified[i]] = struct{}{}
+	}
+
+	autTransaction := &aut.BurnTx{
+		AutIdentifier: []byte(cmd.AUTIdentifier),
+		InAutCoinNum:  0, // will be populated
+		Memo:          []byte{},
+	}
+	return sendAddressAbeAUT(w, autTransaction, nil, 0, txrules.DefaultRelayFeePerKb, 0, 0, utxosSpecified)
+}
 func rangeSpendableUTXOAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.RangeSpendableUTXOAbeCmd)
 	specified := false
