@@ -3,7 +3,6 @@ package wallet
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
