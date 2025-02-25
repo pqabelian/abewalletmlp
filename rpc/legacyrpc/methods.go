@@ -1028,23 +1028,34 @@ func getAUTBalance(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		return nil, err
 	}
 
-	coins, utxos, err := w.FetchAddressAUTCoins(autIdentifier, abelAddress[1:len(abelAddress)-32])
+	coins, utxos, unconfirmedTxos, err := w.FetchAddressAUTCoins(autIdentifier, abelAddress[1:len(abelAddress)-32])
 	if err != nil {
 		return nil, err
 	}
 
 	var balance uint64
+	var totalBalance uint64
+	var unconfirmedBalance uint64
 	for i := 0; i < len(coins); i++ {
+		if coins[i].Spent {
+			continue
+		}
+		totalBalance += coins[i].AUTCoinValue
 		if utxos[i] != nil {
 			balance += coins[i].AUTCoinValue
+		}
+		if unconfirmedTxos[i] != nil {
+			unconfirmedBalance += coins[i].AUTCoinValue
 		}
 	}
 
 	type result struct {
-		Balance uint64 `json:"balance"`
+		Balance            uint64 `json:"balance"`
+		TotalBalance       uint64 `json:"total_balance"`
+		UnconfirmedBalance uint64 `json:"unconfirmed_balance"`
 	}
 
-	return result{Balance: balance}, err
+	return result{Balance: balance, TotalBalance: totalBalance, UnconfirmedBalance: unconfirmedBalance}, err
 }
 
 func burnAUTBalance(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
@@ -1067,7 +1078,7 @@ func burnAUTBalance(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		return nil, err
 	}
 
-	coins, utxos, err := w.FetchAddressAUTCoins(autIdentifier, abelAddress[1:len(abelAddress)-32])
+	coins, utxos, _, err := w.FetchAddressAUTCoins(autIdentifier, abelAddress[1:len(abelAddress)-32])
 	if err != nil {
 		return nil, err
 	}

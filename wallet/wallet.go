@@ -3,6 +3,7 @@ package wallet
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
@@ -1091,24 +1092,25 @@ func (w *Wallet) FetchAUTCoins(autIdentifier string, isRootCoin bool) ([]*wtxmgr
 	return coins, utxos, err
 }
 
-func (w *Wallet) FetchAddressAUTCoins(autIdentifier []byte, cryptoAddress []byte) ([]*wtxmgr.AUTCoin, []*wtxmgr.SpendableTXO, error) {
+func (w *Wallet) FetchAddressAUTCoins(autIdentifier []byte, cryptoAddress []byte) ([]*wtxmgr.AUTCoin, []*wtxmgr.SpendableTXO, []*wtxmgr.UnconfirmedTXO, error) {
 	privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
 	if err != nil {
-		return nil, nil, errors.New("fail to parse crypto address")
+		return nil, nil, nil, errors.New("fail to parse crypto address")
 	}
 	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
-		return nil, nil, errors.New("unexpected privacy level of crypto address")
+		return nil, nil, nil, errors.New("unexpected privacy level of crypto address")
 	}
 	addrKey := chainhash.DoubleHashB(coinAddress)
 
 	var coins []*wtxmgr.AUTCoin
 	var utxos []*wtxmgr.SpendableTXO
+	var unconfirmedTxos []*wtxmgr.UnconfirmedTXO
 	err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
 		txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
-		coins, utxos, err = w.TxStore.AddressAUTCoins(txmgrNs, autIdentifier, addrKey)
+		coins, utxos, unconfirmedTxos, err = w.TxStore.AddressAUTCoins(txmgrNs, autIdentifier, addrKey)
 		return err
 	})
-	return coins, utxos, nil
+	return coins, utxos, unconfirmedTxos, nil
 }
 
 func (w *Wallet) FetchConfirmedTxHashs() ([]*chainhash.Hash, error) {

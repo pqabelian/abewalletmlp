@@ -1274,11 +1274,11 @@ func putUnconfirmedTXO(ns walletdb.ReadWriteBucket, sbuTxo *UnconfirmedTXO) erro
 	}
 	return nil
 }
-func fetchUnconfirmedTXO(ns walletdb.ReadWriteBucket, hash chainhash.Hash, index uint8) (*UnconfirmedTXO, error) {
+func fetchUnconfirmedTXO(ns walletdb.ReadBucket, hash chainhash.Hash, index uint8) (*UnconfirmedTXO, error) {
 	k := canonicalOutPointAbe(hash, index)
 	v := ns.NestedReadBucket(bucketSpentButUnmined).Get(k)
-	if v == nil {
-		return nil, fmt.Errorf("empty entry")
+	if len(v) == 0 {
+		return nil, nil
 	}
 	sbu := new(UnconfirmedTXO)
 	err := sbu.Deserialize(&wire.OutPointAbe{
@@ -1334,8 +1334,8 @@ func putConfirmedTXO(ns walletdb.ReadWriteBucket, scTxo *ConfirmedTXO) error {
 func fetchConfirmedTXO(ns walletdb.ReadWriteBucket, hash chainhash.Hash, index uint8) (*ConfirmedTXO, error) {
 	k := canonicalOutPointAbe(hash, index)
 	v := ns.NestedReadBucket(bucketSpentConfirmed).Get(k)
-	if v == nil {
-		return nil, fmt.Errorf("empty entry")
+	if len(v) == 0 {
+		return nil, nil
 	}
 	sct := new(ConfirmedTXO)
 	err := sct.Deserialize(&wire.OutPointAbe{
