@@ -2434,7 +2434,7 @@ func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 		Version:  mtx.Version,
 	}
 
-	if mtx.HasWitness() && verbose == 2 {
+	if mtx.HasTxWitness() && verbose == 2 {
 		txReply.Witness = hex.EncodeToString(mtx.TxWitness)
 	}
 
