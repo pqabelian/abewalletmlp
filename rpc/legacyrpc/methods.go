@@ -2419,6 +2419,8 @@ func decodeHexStr(hexStr string) ([]byte, error) {
 	return decoded, nil
 }
 
+// todo (CTAUT):  investigate whether the caller of this function uses txReply.Witness to recover the TxWitness and AutWitness,
+// it should call abeutil.DecodeTxWitnesses().
 func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 	txHash string, blkHeader *wire.BlockHeader, blkHash string,
 	blkHeight int32, chainHeight int32, verbose int) (*abejson.TxRawResultAbe, error) {
@@ -2435,7 +2437,9 @@ func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 	}
 
 	if mtx.HasTxWitness() && verbose == 2 {
-		txReply.Witness = hex.EncodeToString(mtx.TxWitness)
+		// txReply.Witness = hex.EncodeToString(mtx.TxWitness)
+		encodedWitness := abeutil.EncodeTxWitnesses(mtx.Version, mtx.TxWitness, mtx.AutWitness)
+		txReply.Witness = hex.EncodeToString(encodedWitness)
 	}
 
 	if blkHeader != nil {
