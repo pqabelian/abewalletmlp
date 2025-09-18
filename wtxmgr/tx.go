@@ -2128,7 +2128,8 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 
 		//create a view to generate the all rings
 		txoRingSize := int(wire.GetTxoRingSizeByBlockHeight(block.Height))
-		newTxoRings, err := blockchain.BuildTxoRingsMLP(int(blockNum), txoRingSize, blocks)
+		// newTxoRings, err := blockchain.BuildTxoRingsMLP(int(blockNum), txoRingSize, blocks)
+		newTxoRings, err := blockchain.BuildTxoRingsAconcagua(int(blockNum), txoRingSize, blocks)
 		if err != nil {
 			return err
 		}
