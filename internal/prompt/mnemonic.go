@@ -101,6 +101,7 @@ func SeedToWords(cryptoScheme abecryptoxparam.CryptoScheme, seed []byte, wordlis
 
 func seedToWords(seed []byte, wordlist []string) ([]string, error) {
 	res := make([]string, 0, MnemonicNum)
+	// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
 	hash := chainhash.DoubleHashH(seed)
 	tmp := make([]byte, len(seed)+1)
 	copy(tmp, seed)
@@ -191,6 +192,7 @@ func wordsToSeed(words []string, wordMap map[string]int) ([]byte, error) {
 	if len(res) != SeedLength+1 {
 		return nil, errors.New("Invalid mnemonic word list specified\n")
 	}
+	// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
 	seedH := chainhash.DoubleHashH(res[:SeedLength])
 	if !bytes.Equal(seedH[:1], res[SeedLength:]) {
 		return nil, errors.New("Invalid mnemonic word list specified")

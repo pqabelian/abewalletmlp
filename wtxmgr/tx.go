@@ -215,6 +215,8 @@ func NewTxRecord(serializedTx []byte, received time.Time) (*TxRecord, error) {
 		str := "failed to deserialize transaction"
 		return nil, storeError(ErrInput, str, err)
 	}
+
+	// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
 	copy(rec.Hash[:], chainhash.DoubleHashB(serializedTx))
 	return rec, nil
 }
@@ -450,6 +452,7 @@ func (txo *SpendableTXO) Hash() chainhash.Hash {
 	buf[offset] = txo.RingIndex
 	offset += 1
 
+	// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
 	txo.UTXOHash = chainhash.DoubleHashH(buf)
 	return txo.UTXOHash
 }
@@ -801,6 +804,8 @@ func (r Ring) Hash() []byte {
 		v[offset] = r.Index[i]
 		offset += 1
 	}
+
+	// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
 	return chainhash.DoubleHashB(v)
 }
 
@@ -1364,6 +1369,7 @@ func (s *Store) ReceiveTxo(txOut *wire.TxOutAbe, addrMgrNs walletdb.ReadWriteBuc
 	if err != nil {
 		return false, 0, nil, nil, 0, err
 	}
+	// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
 	return valid, v, chainhash.DoubleHashB(coinAddr), publicRand, privacyLevel, nil
 }
 func (s *Store) GenSNForTxo(txOut *wire.TxOutAbe, addrMgrNs walletdb.ReadWriteBucket, ringHash chainhash.Hash, index uint8) ([]byte, error) {

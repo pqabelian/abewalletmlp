@@ -1373,6 +1373,7 @@ func checkValidAddress(addr []byte, chainParams *chaincfg.Params) error {
 	verifyBytes := addr[:len(addr)-32]
 	dstHash0 := addr[len(addr)-32:]
 	dstHash, _ := chainhash.NewHash(dstHash0)
+	// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
 	realHash := chainhash.DoubleHashH(verifyBytes)
 	if !dstHash.IsEqual(&realHash) {
 		return errors.New("address verification fails: verification hash does not match")
@@ -1726,6 +1727,7 @@ func generateAddressAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 		tmpAddress = append(tmpAddress, netID...)
 		tmpAddress = append(tmpAddress, address...)
 		// generate the hash of (abecrypto.CryptoSchemePQRINGCT || serialized address)
+		// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
 		hash := chainhash.DoubleHashB(tmpAddress[:len(address)+len(netID)])
 		tmpAddress = append(tmpAddress, hash[:]...)
 		res[i] = &tt{
@@ -2326,6 +2328,7 @@ func verifyMessage(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	var buf bytes.Buffer
 	wire.WriteVarString(&buf, 0, "Bitcoin Signed Message:\n")
 	wire.WriteVarString(&buf, 0, cmd.Message)
+	// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
 	expectedMessageHash := chainhash.DoubleHashB(buf.Bytes())
 	pk, wasCompressed, err := btcec.RecoverCompact(btcec.S256(), sig,
 		expectedMessageHash)

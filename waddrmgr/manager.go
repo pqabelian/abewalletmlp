@@ -436,6 +436,7 @@ func (m *Manager) DecryptAddressKey(addressEnc, addressSecretSpEnc, addressSecre
 func (m *Manager) FetchAddressKeyEnc(ns walletdb.ReadBucket, coinAddrBytes []byte) ([]byte, []byte, []byte, []byte, []byte, []byte, error) {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
+	// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
 	addrKey := chainhash.DoubleHashB(coinAddrBytes)
 	return fetchAddressKeyEncByAddrKey(ns, addrKey)
 }
@@ -521,6 +522,7 @@ func (m *Manager) encryptAndPutAddressKeys(ns walletdb.ReadWriteBucket, serializ
 	if err != nil {
 		return err
 	}
+	// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
 	addrKey := chainhash.DoubleHashB(coinAddress)
 
 	m.mtx.Lock()

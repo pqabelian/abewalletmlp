@@ -1099,6 +1099,8 @@ func (w *Wallet) FetchAddressAUTCoins(autIdentifier []byte, cryptoAddress []byte
 	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
 		return nil, nil, nil, errors.New("unexpected privacy level of crypto address")
 	}
+
+	// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
 	addrKey := chainhash.DoubleHashB(coinAddress)
 
 	var coins []*wtxmgr.AUTCoin
