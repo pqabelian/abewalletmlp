@@ -7,17 +7,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
+	"github.com/abesuite/abec/ctaut"
 	"github.com/abesuite/abewalletmlp/wallet/txrules"
-	"sort"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/abesuite/abec/btcec"
 	"github.com/abesuite/abec/chaincfg"
@@ -131,6 +133,12 @@ var rpcHandlers = map[string]struct {
 	"transferaut":   {handler: transferAUT},
 	"reregisteraut": {handler: reRegisterAUTTransaction},
 	"burnaut":       {handler: burnAUTTransaction},
+
+	"registerctaut":   {handler: registerCTAUT},
+	"reregisterctaut": {handler: reRegisterCTAUT},
+	"mintctaut":       {handler: mintCTAUT},
+	"transferctaut":   {handler: transferCTAUT},
+	"burnctaut":       {handler: burnCTAUT},
 
 	"getautbalance":  {handler: getAUTBalance},
 	"burnautbalance": {handler: burnAUTBalance},
@@ -1007,6 +1015,7 @@ func listAUTCoins(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 
 	return res, nil
 }
+
 func getAUTBalance(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.GetAUTBalanceCmd)
 
@@ -1381,6 +1390,18 @@ func checkValidAddress(addr []byte, chainParams *chaincfg.Params) error {
 	return nil
 }
 
+func getIssuerTokenFromAddress(cryptoAddress []byte) ([]byte, error) {
+	privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
+	if err != nil {
+		return nil, err
+	}
+	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+		return nil, errors.New("only pseudonymCT address is supported")
+	}
+
+	return coinAddress, nil
+}
+
 func makeOutputDescsForPairs(w *wallet.Wallet, pairs []abejson.Pair, chainParams *chaincfg.Params) ([]*abecryptox.AbeTxOutputDesc, error) {
 	outputDescs := make([]*abecryptox.AbeTxOutputDesc, 0, len(pairs))
 	for i := 0; i < len(pairs); i++ {
@@ -1511,7 +1532,7 @@ func sendAddressAbe(w *wallet.Wallet, amounts []abejson.Pair,
 			}
 		}
 	}
-	tx, err := w.SendOutputs(outputDescs, minconf, feePerKbSpecified, feeSpecified, utxoSpecified, specifiedPrivacyLevel, changeToPrivacyLevel, "", requestHash) // TODO(abe): what's label?
+	tx, err := w.SendOutputs(outputDescs, minconf, feePerKbSpecified, feeSpecified, utxoSpecified, nil, specifiedPrivacyLevel, changeToPrivacyLevel, "", requestHash) // TODO(abe): what's label?
 	if err != nil {
 		if err == txrules.ErrAmountNegative {
 			return "", ErrNeedPositiveAmount
@@ -1569,6 +1590,40 @@ func sendAddressAbeAUT(w *wallet.Wallet, autTransaction aut.Transaction, amounts
 	return txHashStr, nil
 }
 
+func sendAddressAbeCTAUT(w *wallet.Wallet,
+	script []byte, scriptWitness []byte,
+	amounts []abejson.Pair,
+	minconf int32, feePerKbSpecified abeutil.Amount,
+	utxoSpecified []string, hostOutpoints []*wire.OutPointAbe) (string, error) {
+
+	outputDescs, err := makeOutputDescsForPairs(w, amounts, w.ChainParams())
+	if err != nil {
+		return "", err
+	}
+	tx, err := w.SendOutputsCTAUT(script, scriptWitness,
+		outputDescs, minconf, feePerKbSpecified, utxoSpecified, hostOutpoints)
+	if err != nil {
+		if err == txrules.ErrAmountNegative {
+			return "", ErrNeedPositiveAmount
+		}
+		if waddrmgr.IsError(err, waddrmgr.ErrLocked) {
+			return "", &ErrWalletUnlockNeeded
+		}
+		switch err.(type) {
+		case abejson.RPCError:
+			return "", err
+		}
+
+		return "", &abejson.RPCError{
+			Code:    abejson.ErrRPCInternal.Code,
+			Message: err.Error(),
+		}
+	}
+	txHashStr := tx.Tx.TxHash().String()
+	log.Infof("Successfully sent transaction %v", txHashStr)
+	return txHashStr, nil
+}
+
 func sendPairsAbe(w *wallet.Wallet, amounts map[string]abeutil.Amount,
 	minconf int32, feePerKbSpecified abeutil.Amount, feeSpecified abeutil.Amount, utxoSpecified []string) (string, error) {
 
@@ -1577,7 +1632,7 @@ func sendPairsAbe(w *wallet.Wallet, amounts map[string]abeutil.Amount,
 	if err != nil {
 		return "", err
 	}
-	tx, err := w.SendOutputs(outputDescs, minconf, feePerKbSpecified, feeSpecified, utxoSpecified, nil, nil, "", nil) // TODO(abe): what's label?
+	tx, err := w.SendOutputs(outputDescs, minconf, feePerKbSpecified, feeSpecified, utxoSpecified, nil, nil, nil, "", nil) // TODO(abe): what's label?
 	if err != nil {
 		if err == txrules.ErrAmountNegative {
 			return "", ErrNeedPositiveAmount
@@ -1701,7 +1756,8 @@ func generateAddressAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 	}
 
 	if privacyLevel != abecryptoxkey.PrivacyLevelRINGCT &&
-		privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+		privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM &&
+		privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
 		msg := "unsupported privacy level"
 		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre {
 			msg += ": addresses of the specified type can be created using abewalletlegacy"
@@ -2026,6 +2082,456 @@ func burnAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 		Memo:          []byte{},
 	}
 	return sendAddressAbeAUT(w, autTransaction, nil, 0, txrules.DefaultRelayFeePerKb, 0, 0, utxosSpecified)
+}
+
+func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+	cmd := icmd.(*abejson.RegisterCTAUTCmd)
+
+	if len(cmd.CTAUTName) > ctaut.MaxCTAUTNameLength {
+		return nil, fmt.Errorf("the length of name is expected no more than %d, but got %d", ctaut.MaxCTAUTNameLength, len(cmd.CTAUTName))
+	}
+	if len(cmd.CTAUTSymbol) > ctaut.MaxCTAUTSymbolLength {
+		return nil, fmt.Errorf("the length of symbol is expected no more than %d, but got %d", ctaut.MaxCTAUTSymbolLength, len(cmd.CTAUTSymbol))
+	}
+	if len(cmd.BaseUnitName) > ctaut.MaxBaseUnitLength {
+		return nil, fmt.Errorf("the base-unit name is expected to no more than %d, but got %d", ctaut.MaxBaseUnitLength, len(cmd.BaseUnitName))
+	}
+	if len(cmd.SubUnitName) > ctaut.MaxSubUnitLength {
+		return nil, fmt.Errorf("the sub-unit name is expected to no more than %d, but got %d", ctaut.MaxSubUnitLength, len(cmd.SubUnitName))
+	}
+	if cmd.UnitScale > ctaut.MaxAmount {
+		return nil, fmt.Errorf("the unit scale is expected to no more than %d, but got %d", ctaut.MaxAmount, cmd.UnitScale)
+	}
+
+	// unique issuer token check
+	existIssuerToken := map[string]struct{}{}
+	issuerTokens := make([][]byte, 0, len(cmd.IssuerTokens))
+	cryptoAddresses := make([][]byte, 0, len(issuerTokens))
+	for i := 0; i < len(cmd.IssuerTokens); i++ {
+		if _, ok := existIssuerToken[cmd.IssuerTokens[i]]; !ok {
+			existIssuerToken[cmd.IssuerTokens[i]] = struct{}{}
+		}
+		instanceAddress, err := hex.DecodeString(cmd.IssuerTokens[i])
+		if err != nil {
+			return nil, fmt.Errorf("%d-th issuer token can not be decoded", i)
+		}
+		err = checkValidAddress(instanceAddress, w.ChainParams())
+		if err != nil {
+			return nil, err
+		}
+		cryptoAddress := instanceAddress[1 : len(instanceAddress)-32]
+		cryptoAddresses = append(cryptoAddresses, cryptoAddress)
+
+		issuerToken, err := getIssuerTokenFromAddress(cryptoAddress)
+		if err != nil {
+			return nil, err
+		}
+		issuerTokens = append(issuerTokens, issuerToken)
+	}
+	if len(existIssuerToken) != len(cmd.IssuerTokens) {
+		return nil, errors.New("issuer token can not contain duplicate")
+	}
+	if int(cmd.MintThreshold) > len(cmd.IssuerTokens) {
+		return nil, fmt.Errorf("the issue threshold should not exceed declared issuer tokens %d", len(cmd.IssuerTokens))
+	}
+	if int(cmd.ReRegisterThreshold) > len(cmd.IssuerTokens) {
+		return nil, fmt.Errorf("the update threshold should not exceed declared issuer tokens %d", len(cmd.IssuerTokens))
+	}
+
+	outputs := make([]abejson.Pair, 0, (cmd.IssuerTimes+1)*len(cmd.IssuerTokens))
+	for i := 0; i < len(cmd.IssuerTokens); i++ {
+		for j := 0; j < cmd.IssuerTimes+1; j++ { // additional one for re-registration
+			outputs = append(outputs, abejson.Pair{
+				Address: cmd.IssuerTokens[i],
+				Amount:  1,
+			})
+		}
+	}
+
+	autScript := ctaut.NewRegistrationScript([]byte(cmd.CTAUTName), []byte(cmd.CTAUTSymbol),
+		[]byte(cmd.BaseUnitName), []byte(cmd.SubUnitName), cmd.UnitScale,
+		[]byte(cmd.CTAUTMemo), cmd.PlannedTotalAmount, issuerTokens,
+		cmd.MintThreshold, cmd.ReRegisterThreshold, cmd.ExpireHeight,
+		uint8(len(outputs)), []byte{})
+
+	serializedAutScript, err := autScript.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	return sendAddressAbeCTAUT(w, serializedAutScript, nil,
+		outputs, 0, txrules.DefaultRelayFeePerKb, nil, nil)
+}
+
+func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+	cmd := icmd.(*abejson.ReRegisterCTAUTCmd)
+
+	// unique issuer token check
+	existIssuerToken := map[string]struct{}{}
+	issuerTokens := make([][]byte, 0, len(cmd.IssuerTokens))
+	cryptoAddresses := make([][]byte, 0, len(issuerTokens))
+	for i := 0; i < len(cmd.IssuerTokens); i++ {
+		if _, ok := existIssuerToken[cmd.IssuerTokens[i]]; !ok {
+			existIssuerToken[cmd.IssuerTokens[i]] = struct{}{}
+		}
+		instanceAddress, err := hex.DecodeString(cmd.IssuerTokens[i])
+		if err != nil {
+			return nil, fmt.Errorf("%d-th issuer token can not be decoded", i)
+		}
+		err = checkValidAddress(instanceAddress, w.ChainParams())
+		if err != nil {
+			return nil, err
+		}
+		cryptoAddress := instanceAddress[1 : len(instanceAddress)-32]
+		cryptoAddresses = append(cryptoAddresses, cryptoAddress)
+
+		issuerToken, err := getIssuerTokenFromAddress(cryptoAddress)
+		if err != nil {
+			return nil, err
+		}
+		issuerTokens = append(issuerTokens, issuerToken)
+	}
+	if len(existIssuerToken) != len(cmd.IssuerTokens) {
+		return nil, errors.New("issuer token can not contain duplicate")
+	}
+	if int(cmd.MintThreshold) > len(cmd.IssuerTokens) {
+		return nil, fmt.Errorf("the issue threshold should not exceed declared issuer tokens %d", len(cmd.IssuerTokens))
+	}
+	if int(cmd.ReRegisterThreshold) > len(cmd.IssuerTokens) {
+		return nil, fmt.Errorf("the update threshold should not exceed declared issuer tokens %d", len(cmd.IssuerTokens))
+	}
+
+	outputs := make([]abejson.Pair, 0, (cmd.IssuerTimes+1)*len(cmd.IssuerTokens))
+	for i := 0; i < len(cmd.IssuerTokens); i++ {
+		for j := 0; j < cmd.IssuerTimes+1; j++ { // additional one for re-registration
+			outputs = append(outputs, abejson.Pair{
+				Address: cmd.IssuerTokens[i],
+				Amount:  1,
+			})
+		}
+	}
+
+	specifiedIdentifier, err := hex.DecodeString(cmd.AUTIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	if len(specifiedIdentifier) != ctaut.CTAUTIdentifierLength {
+		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d",
+			ctaut.CTAUTIdentifierLength, len(specifiedIdentifier))
+	}
+	var identifier [ctaut.CTAUTIdentifierLength]byte
+	copy(identifier[:], specifiedIdentifier[:])
+
+	hostedOutpoints, err := w.GetCTAUTOutpointsForIssuer(identifier[:], cmd.AUTIssuerUpdateThreshold)
+	if err != nil {
+		return nil, err
+	}
+
+	autScript := ctaut.NewReRegistrationScript(identifier, []byte(cmd.CTAUTMemo),
+		cmd.PlannedTotalAmount, issuerTokens,
+		cmd.MintThreshold, cmd.ReRegisterThreshold, cmd.ExpireHeight,
+		uint8(len(hostedOutpoints)), uint8(len(outputs)), []byte(cmd.Memo))
+
+	serializedAutScript, err := autScript.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	return sendAddressAbeCTAUT(w, serializedAutScript, nil,
+		outputs, 0, txrules.DefaultRelayFeePerKb, nil, hostedOutpoints)
+}
+func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+	cmd := icmd.(*abejson.MintCTAUTCmd)
+
+	specifiedIdentifier, err := hex.DecodeString(cmd.AUTIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	if len(specifiedIdentifier) != ctaut.CTAUTIdentifierLength {
+		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d",
+			ctaut.CTAUTIdentifierLength, len(specifiedIdentifier))
+	}
+	var identifier [ctaut.CTAUTIdentifierLength]byte
+	copy(identifier[:], specifiedIdentifier[:])
+
+	hostedOutpoints, err := w.GetCTAUTOutpointsForIssuer(identifier[:], cmd.CTAUTMintThreshold)
+	if err != nil {
+		return nil, err
+	}
+
+	vin := uint64(0)
+	outCTAutTokenNum := uint8(0)
+	outPlainAutTokenNum := uint8(0)
+	autTxOutputDescs := make([]*abecryptox.AutTxOutputDesc, 0, len(cmd.Recipients))
+	outputs := make([]abejson.Pair, 0, len(cmd.Recipients))
+	for i := 0; i < len(cmd.Recipients); i++ {
+		if cmd.Recipients[i].Value == 0 {
+			return nil, fmt.Errorf("the value of the %d-th recipient is 0", i)
+		}
+		vin += cmd.Recipients[i].Value
+
+		outputs = append(outputs, abejson.Pair{
+			Address: cmd.Recipients[i].Address,
+			Amount:  1,
+		})
+
+		if cmd.Recipients[i].Hidden {
+			outCTAutTokenNum++
+
+			instanceAddress, err := hex.DecodeString(cmd.Recipients[i].Address)
+			if err != nil {
+				return nil, fmt.Errorf("%d-th issuer token can not be decoded", i)
+			}
+			err = checkValidAddress(instanceAddress, w.ChainParams())
+			if err != nil {
+				return nil, err
+			}
+			cryptoAddress := instanceAddress[1 : len(instanceAddress)-32]
+
+			privacyLevel, _, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
+			if err != nil {
+				return nil, err
+			}
+			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+				return nil, fmt.Errorf("the %d-th recipient is not a pseudonymCT address", i)
+			}
+
+			autTxOutputDescs = append(autTxOutputDescs, abecryptox.NewAutTxOutDesc(abecryptox.AutTxoTypeHidden, cmd.Recipients[i].Value, coinValuePublicKey))
+		} else {
+			outPlainAutTokenNum++
+			autTxOutputDescs = append(autTxOutputDescs, abecryptox.NewAutTxOutDesc(abecryptox.AutTxoTypePublic, cmd.Recipients[i].Value, nil))
+		}
+	}
+	if vin != cmd.Vin {
+		return nil, fmt.Errorf("the input value is not equal to the sum of the output values")
+	}
+	autCoinbaseTx, err := abecryptox.AutCoinbaseTxGen(wire.TxVersion, vin, autTxOutputDescs)
+	if err != nil {
+		return nil, err
+	}
+	if len(autCoinbaseTx.TxOuts) != len(autTxOutputDescs) {
+		return nil, fmt.Errorf("the number of outputs is not equal to the number of output descriptions")
+	}
+	valueScripts := make([][]byte, len(autCoinbaseTx.TxOuts))
+	for i := 0; i < len(autCoinbaseTx.TxOuts); i++ {
+		valueScripts[i] = autCoinbaseTx.TxOuts[i].TxoScript
+	}
+
+	scriptWitness := autCoinbaseTx.TxWitness
+	witnessHash := chainhash.HashH(autCoinbaseTx.TxWitness)
+
+	autScript := ctaut.NewMintScript(identifier,
+		vin, uint8(len(hostedOutpoints)),
+		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
+		witnessHash, []byte(cmd.Memo))
+
+	serializedAutScript, err := autScript.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	return sendAddressAbeCTAUT(w, serializedAutScript, scriptWitness,
+		outputs, 0, txrules.DefaultRelayFeePerKb, nil, hostedOutpoints)
+}
+func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+	cmd := icmd.(*abejson.TransferCTAUTCmd)
+
+	specifiedIdentifier, err := hex.DecodeString(cmd.AUTIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	if len(specifiedIdentifier) != ctaut.CTAUTIdentifierLength {
+		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d",
+			ctaut.CTAUTIdentifierLength, len(specifiedIdentifier))
+	}
+	var identifier [ctaut.CTAUTIdentifierLength]byte
+	copy(identifier[:], specifiedIdentifier[:])
+
+	target := uint64(0)
+	outCTAutTokenNum := uint8(0)
+	outPlainAutTokenNum := uint8(0)
+	autTxOutputDescs := make([]*abecryptox.AutTxOutputDesc, 0, len(cmd.Recipients))
+	outputs := make([]abejson.Pair, 0, len(cmd.Recipients))
+	for i := 0; i < len(cmd.Recipients); i++ {
+		if cmd.Recipients[i].Value == 0 {
+			return nil, fmt.Errorf("the value of the %d-th recipient is 0", i)
+		}
+		target += cmd.Recipients[i].Value
+
+		outputs = append(outputs, abejson.Pair{
+			Address: cmd.Recipients[i].Address,
+			Amount:  1,
+		})
+
+		if cmd.Recipients[i].Hidden {
+			outCTAutTokenNum++
+
+			instanceAddress, err := hex.DecodeString(cmd.Recipients[i].Address)
+			if err != nil {
+				return nil, fmt.Errorf("%d-th issuer token can not be decoded", i)
+			}
+			err = checkValidAddress(instanceAddress, w.ChainParams())
+			if err != nil {
+				return nil, err
+			}
+			cryptoAddress := instanceAddress[1 : len(instanceAddress)-32]
+
+			privacyLevel, _, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
+			if err != nil {
+				return nil, err
+			}
+			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+				return nil, fmt.Errorf("the %d-th recipient is not a pseudonymCT address", i)
+			}
+
+			autTxOutputDescs = append(autTxOutputDescs, abecryptox.NewAutTxOutDesc(abecryptox.AutTxoTypeHidden, cmd.Recipients[i].Value, coinValuePublicKey))
+		} else {
+			outPlainAutTokenNum++
+			autTxOutputDescs = append(autTxOutputDescs, abecryptox.NewAutTxOutDesc(abecryptox.AutTxoTypePublic, cmd.Recipients[i].Value, nil))
+		}
+	}
+
+	autTxInputDescs, hostedOutpoints, inCTAUTTokenNum, inPlainAUTTokenNum, changeValue, err := w.GetCTAUTOutpointsForTransfer(identifier[:], target)
+	if err != nil {
+		return nil, err
+	}
+	if changeValue > 0 {
+		outPlainAutTokenNum++ // support CT-AUT Token as change
+
+		autTxOutputDescs = append(autTxOutputDescs, abecryptox.NewAutTxOutDesc(abecryptox.AutTxoTypePublic, changeValue, nil))
+		outputs = append(outputs, abejson.Pair{
+			Address: cmd.ChangeAddress,
+			Amount:  1,
+		})
+	}
+
+	autTransferTx, err := abecryptox.AutTransferTxGen(wire.TxVersion, autTxInputDescs, autTxOutputDescs)
+	if err != nil {
+		return nil, err
+	}
+	if len(autTransferTx.TxOuts) != len(autTxOutputDescs) {
+		return nil, fmt.Errorf("the number of outputs is not equal to the number of output descriptions")
+	}
+	valueScripts := make([][]byte, len(autTransferTx.TxOuts))
+	for i := 0; i < len(autTransferTx.TxOuts); i++ {
+		valueScripts[i] = autTransferTx.TxOuts[i].TxoScript
+	}
+
+	scriptWitness := autTransferTx.TxWitness
+	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
+
+	autScript := ctaut.NewTransferScript(identifier,
+		inCTAUTTokenNum, inPlainAUTTokenNum,
+		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
+		witnessHash, []byte(cmd.Memo))
+
+	serializedAutScript, err := autScript.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	return sendAddressAbeCTAUT(w, serializedAutScript, scriptWitness,
+		outputs, 0, txrules.DefaultRelayFeePerKb, nil, hostedOutpoints)
+}
+func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+	cmd := icmd.(*abejson.BurnCTAUTCmd)
+
+	specifiedIdentifier, err := hex.DecodeString(cmd.AUTIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	if len(specifiedIdentifier) != ctaut.CTAUTIdentifierLength {
+		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d",
+			ctaut.CTAUTIdentifierLength, len(specifiedIdentifier))
+	}
+	var identifier [ctaut.CTAUTIdentifierLength]byte
+	copy(identifier[:], specifiedIdentifier[:])
+
+	target := uint64(0)
+	outCTAutTokenNum := uint8(0)
+	outPlainAutTokenNum := uint8(0)
+	autTxOutputDescs := make([]*abecryptox.AutTxOutputDesc, 0, len(cmd.Recipients))
+	outputs := make([]abejson.Pair, 0, len(cmd.Recipients))
+	for i := 0; i < len(cmd.Recipients); i++ {
+		if cmd.Recipients[i].Value == 0 {
+			return nil, fmt.Errorf("the value of the %d-th recipient is 0", i)
+		}
+		target += cmd.Recipients[i].Value
+
+		outputs = append(outputs, abejson.Pair{
+			Address: cmd.Recipients[i].Address,
+			Amount:  1,
+		})
+
+		if cmd.Recipients[i].Hidden {
+			outCTAutTokenNum++
+
+			instanceAddress, err := hex.DecodeString(cmd.Recipients[i].Address)
+			if err != nil {
+				return nil, fmt.Errorf("%d-th issuer token can not be decoded", i)
+			}
+			err = checkValidAddress(instanceAddress, w.ChainParams())
+			if err != nil {
+				return nil, err
+			}
+			cryptoAddress := instanceAddress[1 : len(instanceAddress)-32]
+
+			privacyLevel, _, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
+			if err != nil {
+				return nil, err
+			}
+			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+				return nil, fmt.Errorf("the %d-th recipient is not a pseudonymCT address", i)
+			}
+
+			autTxOutputDescs = append(autTxOutputDescs, abecryptox.NewAutTxOutDesc(abecryptox.AutTxoTypeHidden, cmd.Recipients[i].Value, coinValuePublicKey))
+		} else {
+			outPlainAutTokenNum++
+			autTxOutputDescs = append(autTxOutputDescs, abecryptox.NewAutTxOutDesc(abecryptox.AutTxoTypePublic, cmd.Recipients[i].Value, nil))
+		}
+	}
+
+	autTxInputDescs, hostedOutpoints, inCTAUTTokenNum, inPlainAUTTokenNum, changeValue, err := w.GetCTAUTOutpointsForTransfer(identifier[:], target)
+	if err != nil {
+		return nil, err
+	}
+	if changeValue > 0 {
+		outPlainAutTokenNum++ // support CT-AUT Token as change
+
+		autTxOutputDescs = append(autTxOutputDescs, abecryptox.NewAutTxOutDesc(abecryptox.AutTxoTypePublic, changeValue, nil))
+		outputs = append(outputs, abejson.Pair{
+			Address: cmd.ChangeAddress,
+			Amount:  1,
+		})
+	}
+
+	autTransferTx, err := abecryptox.AutTransferTxGen(wire.TxVersion, autTxInputDescs, autTxOutputDescs)
+	if err != nil {
+		return nil, err
+	}
+	if len(autTransferTx.TxOuts) != len(autTxOutputDescs) {
+		return nil, fmt.Errorf("the number of outputs is not equal to the number of output descriptions")
+	}
+	valueScripts := make([][]byte, len(autTransferTx.TxOuts))
+	for i := 0; i < len(autTransferTx.TxOuts); i++ {
+		valueScripts[i] = autTransferTx.TxOuts[i].TxoScript
+	}
+
+	scriptWitness := autTransferTx.TxWitness
+	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
+
+	autScript := ctaut.NewBurnTx(identifier,
+		inCTAUTTokenNum, inPlainAUTTokenNum,
+		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
+		witnessHash, []byte(cmd.Memo))
+
+	serializedAutScript, err := autScript.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	return sendAddressAbeCTAUT(w, serializedAutScript, scriptWitness,
+		outputs, 0, txrules.DefaultRelayFeePerKb, nil, hostedOutpoints)
 }
 
 // sendToAddress handles a sendtoaddress RPC request by creating a new

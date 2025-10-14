@@ -3,8 +3,16 @@ package wallet
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
@@ -14,6 +22,7 @@ import (
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
+	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abewalletmlp/chain"
 	"github.com/abesuite/abewalletmlp/internal/prompt"
@@ -23,11 +32,6 @@ import (
 	"github.com/abesuite/abewalletmlp/walletdb"
 	"github.com/abesuite/abewalletmlp/walletdb/migration"
 	"github.com/abesuite/abewalletmlp/wtxmgr"
-	"math"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -127,8 +131,9 @@ type Wallet struct {
 	// call the rescan RPC.
 
 	// Channel for transaction creation requests.
-	createTxRequests    chan createTxRequest
-	createTxAUTRequests chan createTxAUTRequest
+	createTxRequests      chan createTxRequest
+	createTxAUTRequests   chan createTxAUTRequest
+	createTxCTAUTRequests chan createTxCTAUTRequest
 
 	// Channels for the manager locker.
 	unlockRequests     chan unlockRequest
@@ -675,6 +680,21 @@ type (
 		tx  *txauthor.AuthoredTxAbe
 		err error
 	}
+
+	createTxCTAUTRequest struct {
+		script            []byte
+		scriptWitness     []byte
+		txOutDescs        []*abecryptox.AbeTxOutputDesc
+		minconf           int32
+		feePerKbSpecified abeutil.Amount
+		resp              chan createTxCTAUTResponse
+		utxoSpecified     []string
+		outpoints         []*wire.OutPointAbe
+	}
+	createTxCTAUTResponse struct {
+		tx  *txauthor.AuthoredTxAbe
+		err error
+	}
 )
 
 // txCreator is responsible for the input selection and creation of
@@ -714,6 +734,20 @@ out:
 
 			heldUnlock.release()
 			txr.resp <- createTxAUTResponse{tx, err}
+		case txr := <-w.createTxCTAUTRequests:
+			heldUnlock, err := w.holdUnlock()
+			if err != nil {
+				txr.resp <- createTxCTAUTResponse{nil, err}
+				continue
+			}
+
+			tx, err := w.txPqringCTToOutputsCTAUT(txr.script, txr.scriptWitness,
+				txr.txOutDescs,
+				txr.minconf, txr.feePerKbSpecified,
+				txr.utxoSpecified, txr.outpoints)
+
+			heldUnlock.release()
+			txr.resp <- createTxCTAUTResponse{tx, err}
 		case <-quit:
 			break out
 		}
@@ -732,11 +766,14 @@ out:
 // the database. A tx created with this set to true SHOULD NOT be broadcasted.
 func (w *Wallet) CreateSimpleTx(outputDescs []*abecryptox.AbeTxOutputDesc, minconf int32,
 	feePerKbSpecified abeutil.Amount, feeSpecified abeutil.Amount, utxoSpecified []string,
-	specifiedPrivacyLevel *abecryptoxkey.PrivacyLevel, changeToPrivacyLevel *abecryptoxkey.PrivacyLevel, dryRun bool) (*txauthor.AuthoredTxAbe, error) {
+	memo []byte,
+	specifiedPrivacyLevel *abecryptoxkey.PrivacyLevel, changeToPrivacyLevel *abecryptoxkey.PrivacyLevel,
+	dryRun bool) (*txauthor.AuthoredTxAbe, error) {
 
 	req := createTxRequest{
 		txOutDescs:            outputDescs,
 		minconf:               minconf,
+		memo:                  memo,
 		feePerKbSpecified:     feePerKbSpecified,
 		feeSpecified:          feeSpecified,
 		utxoSpecified:         utxoSpecified,
@@ -764,6 +801,25 @@ func (w *Wallet) CreateSimpleTxAUT(autTransaction aut.Transaction, outputDescs [
 		utxoSpecified:           utxoSpecified,
 	}
 	w.createTxAUTRequests <- req
+	resp := <-req.resp
+	return resp.tx, resp.err
+}
+func (w *Wallet) CreateSimpleTxCTAUT(script []byte, scriptWitness []byte,
+	outputDescs []*abecryptox.AbeTxOutputDesc,
+	minconf int32, feePerKbSpecified abeutil.Amount,
+	utxoSpecified []string, outpoints []*wire.OutPointAbe) (*txauthor.AuthoredTxAbe, error) {
+
+	req := createTxCTAUTRequest{
+		script:            script,
+		scriptWitness:     scriptWitness,
+		txOutDescs:        outputDescs,
+		minconf:           minconf,
+		feePerKbSpecified: feePerKbSpecified,
+		resp:              make(chan createTxCTAUTResponse),
+		utxoSpecified:     utxoSpecified,
+		outpoints:         outpoints,
+	}
+	w.createTxCTAUTRequests <- req
 	resp := <-req.resp
 	return resp.tx, resp.err
 }
@@ -1609,7 +1665,7 @@ func confirms(txHeight, curHeight int32) int32 {
 
 func (w *Wallet) SendOutputs(outputDescs []*abecryptox.AbeTxOutputDesc,
 	minconf int32, feePerKbSpecified abeutil.Amount, feeSpecified abeutil.Amount,
-	utxoSpecified []string,
+	utxoSpecified []string, memo []byte,
 	specifiedPrivacyLevel *abecryptoxkey.PrivacyLevel, changeToPrivacyLevel *abecryptoxkey.PrivacyLevel,
 	label string, requestHash *chainhash.Hash) (*txauthor.AuthoredTxAbe, error) {
 	// Ensure the outputs to be created adhere to the network's consensus
@@ -1627,7 +1683,10 @@ func (w *Wallet) SendOutputs(outputDescs []*abecryptox.AbeTxOutputDesc,
 	// transaction will be added to the database in order to ensure that we
 	// continue to re-broadcast the transaction upon restarts until it has
 	// been confirmed.
-	createdTx, err := w.CreateSimpleTx(outputDescs, minconf, feePerKbSpecified, feeSpecified, utxoSpecified, specifiedPrivacyLevel, changeToPrivacyLevel, false)
+	createdTx, err := w.CreateSimpleTx(outputDescs,
+		minconf, feePerKbSpecified, feeSpecified,
+		utxoSpecified, memo,
+		specifiedPrivacyLevel, changeToPrivacyLevel, false)
 	if err != nil {
 		if w.RecordRequestFlag && len(utxoSpecified) != 0 {
 			log.Errorf("can not create a transaction for request hash %s with specified utxo %s:%v", requestHash, utxoSpecified, err)
@@ -1692,6 +1751,64 @@ func (w *Wallet) SendOutputsAUT(autTransaction aut.Transaction, outputDescs []*a
 	// continue to re-broadcast the transaction upon restarts until it has
 	// been confirmed.
 	createdTx, err := w.CreateSimpleTxAUT(autTransaction, outputDescs, minconf, feePerKbSpecified, autIssueTokenThreshold, autIssueUpdateThreshold, utxoSpecified)
+	if err != nil {
+		return nil, err
+	}
+
+	// it means that the transaction is created successful
+	txHash, err := w.reliablyPublishTransaction(createdTx.Tx, "", nil)
+	if err != nil {
+		// the wallet would fetch the transaction
+		// due to error double spending
+		// And then insert the transaction into database
+		// But current do nothing? TODO 202207
+		if _, ok := err.(*ErrDoubleSpend); ok {
+			// do nothing
+		}
+		return nil, err
+	}
+
+	for i := 0; i < len(createdTx.Tx.TxOuts); i++ {
+		printedLength := len(createdTx.Tx.TxOuts[i].TxoScript)
+		if printedLength > 64 {
+			printedLength = 64
+		}
+		log.Debugf("tx output [%d] = %x\n", i, createdTx.Tx.TxOuts[i].TxoScript[:printedLength])
+	}
+	// Sanity check on the returned tx hash.
+	// something error ?
+	if *txHash != createdTx.Tx.TxHash() {
+		return nil, errors.New("tx hash mismatch")
+	}
+
+	return createdTx, nil
+}
+
+func (w *Wallet) SendOutputsCTAUT(
+	script []byte, scriptWitness []byte,
+	outputDescs []*abecryptox.AbeTxOutputDesc,
+	minconf int32, feePerKbSpecified abeutil.Amount,
+	utxoSpecified []string, hostedOutpoints []*wire.OutPointAbe) (*txauthor.AuthoredTxAbe, error) {
+	// Ensure the outputs to be created adhere to the network's consensus
+	// rules.
+	for _, txOutDesc := range outputDescs {
+		err := txrules.CheckOutputDescAbe(
+			txOutDesc, txrules.DefaultRelayFeePerKb,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Create the transaction and broadcast it to the network. The
+	// transaction will be added to the database in order to ensure that we
+	// continue to re-broadcast the transaction upon restarts until it has
+	// been confirmed.
+	createdTx, err := w.CreateSimpleTxCTAUT(
+		script, scriptWitness,
+		outputDescs,
+		minconf, feePerKbSpecified,
+		utxoSpecified, hostedOutpoints)
 	if err != nil {
 		return nil, err
 	}
@@ -2033,6 +2150,142 @@ func (w *Wallet) GetTxHashRequestHash(requestHash string) (res map[string]interf
 	return map[string]interface{}{"txHash": txHashStr, "status": status}, nil
 }
 
+func (w *Wallet) GetCTAUTOutpointsForIssuer(identifier []byte, threshold uint8) ([]*wire.OutPointAbe, error) {
+	var outpoints []*wire.OutPointAbe
+	var err error
+	err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
+		txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
+		tokens, _, err := w.TxStore.UnspentOutputsCTAUT(txmgrNs, identifier, true)
+		if err != nil {
+			return err
+		}
+		outpoints = make([]*wire.OutPointAbe, 0, len(tokens))
+		addrKeyMapping := make(map[string]struct{})
+		for _, token := range tokens {
+			if !token.IsAUTRootCoin {
+				continue
+			}
+			if token.Spent {
+				continue
+			}
+			if _, ok := addrKeyMapping[hex.EncodeToString(token.AddrKey)]; ok {
+				continue
+			}
+			if uint8(len(outpoints)) >= threshold {
+				break
+			}
+			addrKeyMapping[hex.EncodeToString(token.AddrKey)] = struct{}{}
+			outpoints = append(outpoints, &wire.OutPointAbe{
+				TxHash: token.TxOutput.TxHash,
+				Index:  token.TxOutput.Index,
+			})
+		}
+		if uint8(len(outpoints)) < threshold {
+			return fmt.Errorf("not enough root coin to re-register")
+		}
+		return nil
+	})
+	return outpoints, err
+}
+func (w *Wallet) GetCTAUTOutpointsForTransfer(identifier []byte, target uint64) ([]*abecryptox.AutTxInputDesc,
+	[]*wire.OutPointAbe, uint8, uint8, uint64, error) {
+	var autTxInputDescs []*abecryptox.AutTxInputDesc
+	var hostedOutpoints []*wire.OutPointAbe
+	selectedValue := uint64(0)
+	inCTAutTokenNum := 0
+	inPlainAutTokenNum := 0
+
+	var err error
+	err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
+		txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
+		addrmgrNs := tx.ReadBucket(waddrmgrNamespaceKey)
+
+		tokens, _, err := w.TxStore.UnspentOutputsCTAUT(txmgrNs, identifier, false)
+		if err != nil {
+			return err
+		}
+		sort.SliceStable(tokens, func(i, j int) bool {
+			if tokens[i].AutTxoType == tokens[j].AutTxoType {
+				if tokens[i].Value == tokens[j].Value {
+					return tokens[i].Height < tokens[j].Height
+				}
+				return tokens[i].Value < tokens[j].Value
+			}
+
+			if tokens[i].AutTxoType == abecryptox.AutTxoTypeHidden {
+				return true
+			}
+			if tokens[j].AutTxoType == abecryptox.AutTxoTypeHidden {
+				return false
+			}
+			return false
+		})
+
+		autTxInputDescs = make([]*abecryptox.AutTxInputDesc, 0, len(tokens))
+		hostedOutpoints = make([]*wire.OutPointAbe, 0, len(tokens))
+		addrKeyMapping := make(map[string]struct{})
+		for _, token := range tokens {
+			if target == 0 {
+				break
+			}
+			if token.IsAUTRootCoin {
+				continue
+			}
+			if token.Spent {
+				continue
+			}
+			_, ok := addrKeyMapping[hex.EncodeToString(token.AddrKey)]
+			if !ok && len(addrKeyMapping) >= 50 { // TODO replace hardcode
+				continue
+			}
+			if token.AutTxoType == abecryptox.AutTxoTypeHidden {
+				if inCTAutTokenNum >= 5 { // TODO replace hardcode
+					continue
+				}
+				inCTAutTokenNum++
+			} else {
+				inPlainAutTokenNum++
+			}
+
+			addrKeyMapping[hex.EncodeToString(token.AddrKey)] = struct{}{}
+			selectedValue += token.Value
+
+			autTxo := &ctautwire.AutTxo{
+				Version:   wire.TxVersion, // TODO: add version field to CTAUTCoin
+				TxoScript: token.CoinValueScript,
+			}
+
+			_, _, valueRootSeed, _, err := w.Manager.FetchProtectedRootSeeds(addrmgrNs)
+			if err != nil {
+				return err
+			}
+			coinValuePublicKey, coinValueSecretKey, err := abecryptoxkey.CoinValueKeyReGenByRootSeedsFromPublicRand(
+				abecryptoxparam.CryptoSchemePQRingCTX, abecryptoxkey.PrivacyLevelPSEUDONYMCT,
+				valueRootSeed, token.PublicRand)
+			if err != nil {
+				return err
+			}
+			autTxInputDesc := abecryptox.NewAutTxInputDesc(autTxo, coinValuePublicKey, coinValueSecretKey, token.Value)
+			autTxInputDescs = append(autTxInputDescs, autTxInputDesc)
+			hostedOutpoints = append(hostedOutpoints, &wire.OutPointAbe{
+				TxHash: token.TxOutput.TxHash,
+				Index:  token.TxOutput.Index,
+			})
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, nil, 0, 0, 0, err
+	}
+
+	if selectedValue < target {
+		return nil, nil, 0, 0, 0, fmt.Errorf("not enough amount to transfer: input (%d) < output(%d) ", selectedValue, target)
+	}
+
+	return autTxInputDescs, hostedOutpoints, uint8(inCTAutTokenNum), uint8(inPlainAutTokenNum), selectedValue - target, nil
+}
+
 // Create creates a new wallet, writing it to an empty database.  If the passed
 // seed is non-nil, it is used.  Otherwise, a secure random seed of the
 // recommended length is generated.
@@ -2125,23 +2378,24 @@ func Open(db walletdb.DB, pubPass []byte, cbs *waddrmgr.OpenCallbacks,
 	log.Infof("Opened wallet") // TODO: log balance? last sync height?
 
 	w := &Wallet{
-		publicPassphrase:    pubPass,
-		db:                  db,
-		Manager:             addrMgr,
-		TxStore:             txMgr,
-		lockedOutpoints:     map[wire.OutPoint]struct{}{},
-		resendUnminedTxFlag: atomic.Value{},
-		recoveryWindow:      recoveryWindow,
-		createTxRequests:    make(chan createTxRequest),
-		createTxAUTRequests: make(chan createTxAUTRequest),
-		unlockRequests:      make(chan unlockRequest),
-		lockRequests:        make(chan struct{}),
-		holdUnlockRequests:  make(chan chan heldUnlock),
-		lockState:           make(chan bool),
-		changePassphrase:    make(chan changePassphraseRequest),
-		changePassphrases:   make(chan changePassphrasesRequest),
-		chainParams:         params,
-		quit:                make(chan struct{}),
+		publicPassphrase:      pubPass,
+		db:                    db,
+		Manager:               addrMgr,
+		TxStore:               txMgr,
+		lockedOutpoints:       map[wire.OutPoint]struct{}{},
+		resendUnminedTxFlag:   atomic.Value{},
+		recoveryWindow:        recoveryWindow,
+		createTxRequests:      make(chan createTxRequest),
+		createTxAUTRequests:   make(chan createTxAUTRequest),
+		createTxCTAUTRequests: make(chan createTxCTAUTRequest),
+		unlockRequests:        make(chan unlockRequest),
+		lockRequests:          make(chan struct{}),
+		holdUnlockRequests:    make(chan chan heldUnlock),
+		lockState:             make(chan bool),
+		changePassphrase:      make(chan changePassphraseRequest),
+		changePassphrases:     make(chan changePassphrasesRequest),
+		chainParams:           params,
+		quit:                  make(chan struct{}),
 	}
 	w.resendUnminedTxFlag.Store(false)
 

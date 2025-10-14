@@ -5,6 +5,9 @@ import (
 	"crypto/sha512"
 	"errors"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abecryptox/abecryptoutils"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
@@ -18,8 +21,6 @@ import (
 	"github.com/abesuite/abewalletmlp/walletdb"
 	aip11 "github.com/pqabelian/abelian-aip11-go"
 	"golang.org/x/crypto/sha3"
-	"sync"
-	"time"
 )
 
 const (
@@ -440,6 +441,11 @@ func (m *Manager) FetchAddressKeyEnc(ns walletdb.ReadBucket, coinAddrBytes []byt
 	addrKey := chainhash.DoubleHashB(coinAddrBytes)
 	return fetchAddressKeyEncByAddrKey(ns, addrKey)
 }
+func (m *Manager) FetchAddressKeyEncByAddrKey(ns walletdb.ReadBucket, addrKey []byte) ([]byte, []byte, []byte, []byte, []byte, []byte, error) {
+	m.mtx.Lock()
+	defer m.mtx.Unlock()
+	return fetchAddressKeyEncByAddrKey(ns, addrKey)
+}
 
 func (m *Manager) FetchProtectedRootSeeds(ns walletdb.ReadBucket) ([]byte, []byte, []byte, []byte, error) {
 	var spKeyRootSeed []byte
@@ -538,7 +544,9 @@ func (m *Manager) GenerateAddressKeys(ns walletdb.ReadWriteBucket, privacyLevel 
 	if m.cryptoScheme != abecryptoxparam.CryptoSchemePQRingCTX {
 		return nil, nil, nil, nil, nil, nil, errors.New("unsupported crypto scheme")
 	}
-	if privacyLevel != abecryptoxkey.PrivacyLevelRINGCT && privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+	if privacyLevel != abecryptoxkey.PrivacyLevelRINGCT &&
+		privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM &&
+		privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
 		return nil, nil, nil, nil, nil, nil, errors.New("unsupported privacy level")
 	}
 	if m.IsLocked() {

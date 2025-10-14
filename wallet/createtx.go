@@ -5,6 +5,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
+	"sort"
+	"strings"
+
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abecryptox"
@@ -13,16 +18,13 @@ import (
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/ctaut"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abewalletmlp/waddrmgr"
 	"github.com/abesuite/abewalletmlp/wallet/txauthor"
 	"github.com/abesuite/abewalletmlp/walletdb"
 	"github.com/abesuite/abewalletmlp/wtxmgr"
-	"math"
-	"math/big"
-	"sort"
-	"strings"
 )
 
 const (
@@ -377,7 +379,7 @@ func (s byAUTCoinValue) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func createTransferTxAbeMsgTemplateMLP(txIn []*wire.TxInAbe, txOutNum int, txMemo []byte, fee uint64) (*wire.MsgTxAbe, error) {
 	// TODO(MLP) Abewallet would be generate transaction with latest version
 	msgTx := &wire.MsgTxAbe{
-		Version:    wire.TxVersion_Height_MLPAUT_300000,
+		Version:    wire.TxVersion,
 		TxIns:      nil,
 		TxOuts:     make([]*wire.TxOutAbe, txOutNum),
 		TxFee:      fee,
@@ -511,6 +513,13 @@ func fetchUTXOForAUT(eligible []wtxmgr.SpendableTXO, eligibleAUT []*wtxmgr.AUTCo
 		utxosforAUT[eligible[i].TxOutput.String()] = eligible[i]
 
 	}
+
+	return remainUTXOs, utxosforAUT, nil
+}
+func fetchUTXOForCTAUT(eligible []wtxmgr.SpendableTXO, eligibleCTAUT []*wtxmgr.CTAUTCoin, utxoSpecified []string) ([]wtxmgr.SpendableTXO, map[string]wtxmgr.SpendableTXO, error) {
+
+	remainUTXOs := make([]wtxmgr.SpendableTXO, 0)
+	utxosforAUT := make(map[string]wtxmgr.SpendableTXO, len(eligibleCTAUT))
 
 	return remainUTXOs, utxosforAUT, nil
 }
@@ -1301,7 +1310,362 @@ func (w *Wallet) txPqringCTToOutputsMLPAUT(autTransaction aut.Transaction, txOut
 		return nil, errors.New("can not serialize the aut transaction")
 	}
 
-	return w.createTransactionMLPByRootSeeds(selectedTxos, txOutDescs, memo, txFee, true, abecryptoxkey.PrivacyLevelPSEUDONYM, false)
+	return w.createTransactionMLPByRootSeeds(selectedTxos, txOutDescs, memo, txFee, true,
+		abecryptoxkey.PrivacyLevelPSEUDONYM, false)
+}
+func (w *Wallet) txPqringCTToOutputsCTAUT(script []byte, scriptWitness []byte,
+	txOutDescs []*abecryptox.AbeTxOutputDesc,
+	minconf int32, feePerKbSpecified abeutil.Amount,
+	utxoSpecified []string, outpoints []*wire.OutPointAbe) (unsignedTx *txauthor.AuthoredTxAbe, err error) {
+	chainClient, err := w.requireChainClient()
+	if err != nil {
+		return nil, err
+	}
+	if !w.isDevEnv() {
+		log.Debug("Waiting for chain backend to sync to tip")
+		if err := w.waitUntilBackendSynced(chainClient); err != nil {
+			return nil, err
+		}
+		log.Debug("Chain backend synced to tip!")
+	}
+	bs, err := chainClient.BlockStamp()
+	if err != nil {
+		return nil, err
+	}
+
+	txVersion := wire.TxVersion
+	targetValue := abeutil.Amount(0)
+	outputPublic := int64(0)
+	outForRing := 0
+
+	outputCoinAddresses := make([][]byte, len(txOutDescs))
+	for i := 0; i < len(txOutDescs); i++ {
+		privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(txOutDescs[i].CryptoAddress())
+		if err != nil {
+			return nil, err
+		}
+		outputCoinAddresses[i] = coinAddress
+		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			return nil, errors.New("unsupported address type for aut")
+		}
+		value := txOutDescs[i].Value()
+		outputPublic += int64(value)
+		targetValue += abeutil.Amount(value)
+	}
+
+	if targetValue < 0 || targetValue > abeutil.Amount(abeutil.MaxNeutrino) {
+		return nil, fmt.Errorf("target output value %v exceeds the maximum allowd value %v", targetValue, abeutil.MaxNeutrino)
+	}
+
+	maxOutputNum, err := abecryptoxparam.GetTxOutputMaxNum(txVersion)
+	if err != nil {
+		return nil, err
+	}
+	if len(txOutDescs) >= maxOutputNum {
+		return nil, errors.New("transfer too many utxo")
+	}
+
+	maxNumOutputForRing, err := abecryptoxparam.GetTxOutputMaxNumForRing(txVersion)
+	if err != nil {
+		return nil, err
+	}
+	if outForRing > maxNumOutputForRing {
+		return nil, fmt.Errorf("transfer too many utxo for ring, max allow %d but get %d", maxNumOutputForRing, outForRing)
+	}
+
+	maxNumOutputForSingle, err := abecryptoxparam.GetTxOutputMaxNumForSingle(txVersion)
+	if err != nil {
+		return nil, err
+	}
+	if len(txOutDescs)-outForRing > maxNumOutputForSingle {
+		return nil, fmt.Errorf("transfer too many utxo for single, max allow %d but get %d", maxNumOutputForSingle, len(txOutDescs)-outForRing)
+	}
+
+	var eligible []wtxmgr.SpendableTXO
+	err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
+		txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
+		//eligible, rings, err := w.findEligibleOutputsAbe(txmgrNs, minconf, bs)
+		eligible, err = w.findEligibleTxosAbe(txmgrNs, minconf, bs)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	autpointStr := make(map[string]struct{}, len(outpoints))
+	// outpoints would be selected
+	for i := 0; i < len(outpoints); i++ {
+		autpointStr[outpoints[i].String()] = struct{}{}
+	}
+
+	selectedTxos := make([]*wtxmgr.SpendableTXO, 0, len(eligible))
+
+	remainUTXOs := make([]*wtxmgr.SpendableTXO, 0)
+	utxosforAUT := make(map[string]*wtxmgr.SpendableTXO, len(outpoints))
+	for i := 0; i < len(eligible); i++ {
+		if !eligible[i].IsCTAUTCoin() {
+			remainUTXOs = append(remainUTXOs, &eligible[i])
+			continue
+		}
+		_, isSpecifiedAUTPoint := autpointStr[eligible[i].TxOutput.String()]
+		if !isSpecifiedAUTPoint {
+			continue
+		}
+		utxosforAUT[eligible[i].TxOutput.String()] = &eligible[i]
+	}
+	if len(utxosforAUT) != len(outpoints) {
+		return nil, errors.New("not all specified AUT coins can be selected for generate transaction")
+	}
+	for i := 0; i < len(outpoints); i++ {
+		selectedTxos = append(selectedTxos, utxosforAUT[outpoints[i].String()])
+	}
+
+	if len(utxoSpecified) != 0 {
+		utxoSpecifiedMapping := map[string]struct{}{}
+		for i := 0; i < len(utxoSpecified); i++ {
+			utxoSpecifiedMapping[utxoSpecified[i]] = struct{}{}
+		}
+
+		specifiedTxo := make([]*wtxmgr.SpendableTXO, 0, len(utxoSpecified))
+		for i := 0; i < len(remainUTXOs); i++ {
+			if _, exist := utxoSpecifiedMapping[remainUTXOs[i].Hash().String()]; !exist {
+				continue
+			}
+			specifiedTxo = append(specifiedTxo, remainUTXOs[i])
+		}
+		if len(specifiedTxo) != len(utxoSpecified) {
+			return nil, errors.New("not all specified utxo can be selected for generate transaction")
+		}
+
+		selectedTxos = append(selectedTxos, specifiedTxo...)
+	} else {
+		inputRingVersionsForAll := make([]uint32, 0, len(selectedTxos)+len(remainUTXOs))
+		inRingSizesForAll := make([]uint8, 0, len(selectedTxos)+len(remainUTXOs))
+		inputPublic := uint64(0)
+		inForSingleDistinct := uint8(0)
+
+		var currentTotal abeutil.Amount
+		tmpSelectedTxos := make([]*wtxmgr.SpendableTXO, 0, len(selectedTxos))
+		publicRandMapping := make(map[string]struct{}, len(selectedTxos)+len(remainUTXOs))
+		for _, txo := range selectedTxos {
+			inputRingVersionsForAll = append(inputRingVersionsForAll, txo.Version)
+			inRingSizesForAll = append(inRingSizesForAll, txo.RingSize)
+			inputPublic += txo.Amount
+			if _, ok := publicRandMapping[hex.EncodeToString(txo.PublicRand)]; !ok {
+				inForSingleDistinct++
+				publicRandMapping[hex.EncodeToString(txo.PublicRand)] = struct{}{}
+			}
+			currentTotal += abeutil.Amount(txo.Amount)
+			tmpSelectedTxos = append(tmpSelectedTxos, txo)
+		}
+
+		var tmpFee abeutil.Amount
+
+		nextUTXOIdx := 0
+		for nextUTXOIdx < len(remainUTXOs) {
+			currentUtxo := remainUTXOs[nextUTXOIdx]
+			nextUTXOIdx++
+
+			// avoid unconscious burn
+			if currentUtxo.IsCTAUTCoin() {
+				continue
+			}
+
+			inputRingVersionsForAll = append(inputRingVersionsForAll, currentUtxo.Version)
+			inRingSizesForAll = append(inRingSizesForAll, currentUtxo.RingSize)
+			currentTotal += abeutil.Amount(currentUtxo.Amount)
+
+			inputPublic += currentUtxo.Amount
+			if _, ok := publicRandMapping[hex.EncodeToString(currentUtxo.PublicRand)]; !ok {
+				inForSingleDistinct++
+				publicRandMapping[hex.EncodeToString(currentUtxo.PublicRand)] = struct{}{}
+			}
+
+			tmpSelectedTxos = append(tmpSelectedTxos, currentUtxo)
+			if currentTotal < targetValue {
+				continue
+			}
+
+			txConSize, err := wire.PrecomputeTrTxConSizeMLP(txVersion, inputRingVersionsForAll, inRingSizesForAll, outputCoinAddresses, abecryptoxparam.MaxAllowedTxMemoSize)
+			if err != nil {
+				return nil, err
+			}
+			witnessSize, err := abecryptox.GetTrTxWitnessSerializeSizeApprox(txVersion, 0, inForSingleDistinct, nil, 0 /*outputPublic-int64(inputPublic)*/, 0)
+			if err != nil {
+				return nil, err
+			}
+			tmpFee, err = CalculateFee(txConSize, uint32(witnessSize), feePerKbSpecified)
+			if err != nil {
+				return nil, err
+			}
+			if currentTotal >= targetValue+tmpFee {
+				selectedTxos = tmpSelectedTxos
+				break
+			}
+		}
+		if currentTotal < targetValue+tmpFee {
+			return nil, errors.New("not enough ABEL to provide fee")
+		}
+	}
+
+	// estimate transaction fee
+	var txFee abeutil.Amount
+
+	publicRandMapping := make(map[string]struct{}, len(selectedTxos)+len(remainUTXOs))
+	inputRingVersionsForAll := make([]uint32, 0, len(selectedTxos)+len(remainUTXOs))
+	inRingSizesForAll := make([]uint8, 0, len(selectedTxos)+len(remainUTXOs))
+	inputPublic := uint64(0)
+	inForSingleDistinct := uint8(0)
+
+	var currentTotal abeutil.Amount
+	for i := 0; i < len(selectedTxos); i++ {
+		txo := selectedTxos[i]
+
+		inputRingVersionsForAll = append(inputRingVersionsForAll, txo.Version)
+		inRingSizesForAll = append(inRingSizesForAll, txo.RingSize)
+		currentTotal += abeutil.Amount(txo.Amount)
+
+		inputPublic += txo.Amount
+		if _, ok := publicRandMapping[hex.EncodeToString(txo.PublicRand)]; !ok {
+			inForSingleDistinct++
+			publicRandMapping[hex.EncodeToString(txo.PublicRand)] = struct{}{}
+		}
+	}
+	txConSize, err := wire.PrecomputeTrTxConSizeMLP(txVersion, inputRingVersionsForAll, inRingSizesForAll, outputCoinAddresses, abecryptoxparam.MaxAllowedTxMemoSize)
+	if err != nil {
+		return nil, err
+	}
+	witnessSize, err := abecryptox.GetTrTxWitnessSerializeSizeApprox(txVersion, 0, inForSingleDistinct, nil, 0 /*outputPublic-int64(inputPublic)*/, 0)
+	if err != nil {
+		return nil, err
+	}
+	txFee, err = CalculateFee(txConSize, uint32(witnessSize), feePerKbSpecified)
+	if err != nil {
+		return nil, err
+	}
+	if currentTotal < targetValue+txFee {
+		return nil, errors.New("the total amount of selected inputs is not enough to pay fee")
+	}
+	tx, err := w.createTransactionMLPByRootSeeds(selectedTxos, txOutDescs, script, txFee, true, abecryptoxkey.PrivacyLevelPSEUDONYM, false)
+	if err != nil {
+		return nil, err
+	}
+	tx.Tx.AutWitness = scriptWitness
+	return tx, nil
+}
+
+func (w *Wallet) FindEligibleTxosForCTAUT(scriptType ctaut.CTAUTScriptType, identifier []byte, targetNumOrValue uint64) ([]*wire.OutPointAbe, error) {
+	var err error
+	switch scriptType {
+	case ctaut.Registration:
+		return nil, nil
+	case ctaut.ReRegistration:
+		fallthrough
+	case ctaut.Mint:
+		var eligibleAUTTokens []*wtxmgr.CTAUTCoin
+		err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
+			txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
+			unspent, _, err := w.TxStore.UnspentOutputsCTAUT(txmgrNs, identifier, true)
+			if err != nil {
+				return err
+			}
+			eligibleAUTTokens = make([]*wtxmgr.CTAUTCoin, 0, len(unspent))
+			for i := range unspent {
+				output := unspent[i]
+
+				if output.Spent {
+					continue
+				}
+
+				eligibleAUTTokens = append(eligibleAUTTokens, output)
+			}
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		outpoints := make([]*wire.OutPointAbe, 0, targetNumOrValue)
+		addrKeyMap := make(map[string]struct{})
+		for i := 0; i < len(eligibleAUTTokens); i++ {
+			if uint64(len(outpoints)) > targetNumOrValue {
+				break
+			}
+			if !eligibleAUTTokens[i].IsAUTRootCoin {
+				continue
+			}
+			if _, ok := addrKeyMap[hex.EncodeToString(eligibleAUTTokens[i].AddrKey)]; ok {
+				continue
+			}
+			addrKeyMap[hex.EncodeToString(eligibleAUTTokens[i].AddrKey)] = struct{}{}
+			outpoint := &wire.OutPointAbe{
+				TxHash: eligibleAUTTokens[i].TxOutput.TxHash,
+				Index:  eligibleAUTTokens[i].TxOutput.Index,
+			}
+			outpoints = append(outpoints, outpoint)
+		}
+		if len(outpoints) < int(targetNumOrValue) {
+			return nil, errors.New("not enough root coin to re-register")
+		}
+		return outpoints, nil
+
+	case ctaut.Transfer:
+		fallthrough
+	case ctaut.Burn:
+		var eligibleAUTTokens []*wtxmgr.CTAUTCoin
+		err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
+			txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
+			unspent, _, err := w.TxStore.UnspentOutputsCTAUT(txmgrNs, identifier, false)
+			if err != nil {
+				return err
+			}
+			eligibleAUTTokens = make([]*wtxmgr.CTAUTCoin, 0, len(unspent))
+			for i := range unspent {
+				output := unspent[i]
+
+				if output.Spent {
+					continue
+				}
+
+				eligibleAUTTokens = append(eligibleAUTTokens, output)
+			}
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		outpoints := make([]*wire.OutPointAbe, 0, 100)
+		addrKeyMap := make(map[string]struct{})
+		totalValue := uint64(0)
+		for i := 0; i < len(eligibleAUTTokens); i++ {
+			if totalValue >= targetNumOrValue {
+				break
+			}
+			if eligibleAUTTokens[i].IsAUTRootCoin {
+				continue
+			}
+			totalValue += eligibleAUTTokens[i].Value
+			if _, ok := addrKeyMap[hex.EncodeToString(eligibleAUTTokens[i].AddrKey)]; ok {
+				continue
+			}
+			addrKeyMap[hex.EncodeToString(eligibleAUTTokens[i].AddrKey)] = struct{}{}
+			outpoint := &wire.OutPointAbe{
+				TxHash: eligibleAUTTokens[i].TxOutput.TxHash,
+				Index:  eligibleAUTTokens[i].TxOutput.Index,
+			}
+			outpoints = append(outpoints, outpoint)
+		}
+		if totalValue < targetNumOrValue {
+			return nil, errors.New("not enough token to transfer/burn")
+		}
+		return outpoints, nil
+	default:
+		return nil, errors.New("unsupported ct-aut type")
+	}
 }
 
 func (w *Wallet) createTransactionMLPByRootSeeds(
@@ -1329,7 +1693,26 @@ func (w *Wallet) createTransactionMLPByRootSeeds(
 
 	// adjust the order of output descs
 	sort.SliceStable(selectedUTXOs, func(i, j int) bool {
-		return !selectedUTXOs[i].IsPseudonymous() && selectedUTXOs[j].IsPseudonymous()
+		// Priority:
+		// [1] abecryptoxkey.PrivacyLevelRINGCT
+		// [1] abecryptoxkey.PrivacyLevelRINGCTPre
+		// [2] abecryptoxkey.PrivacyLevelPSEUDONYMCT
+		// [3] abecryptoxkey.PrivacyLevelPSEUDONYM
+		isPseudonymousI := selectedUTXOs[i].IsPseudonymous() || selectedUTXOs[i].IsPseudonymousCT()
+		isPseudonymousJ := selectedUTXOs[j].IsPseudonymous() || selectedUTXOs[j].IsPseudonymousCT()
+		if isPseudonymousI && !isPseudonymousJ {
+			return false
+		}
+		if !isPseudonymousI && isPseudonymousJ {
+			return true
+		}
+		if !isPseudonymousI && !isPseudonymousJ {
+			return false
+		}
+		if selectedUTXOs[i].IsPseudonymousCT() && !selectedUTXOs[j].IsPseudonymousCT() {
+			return true
+		}
+		return false
 	})
 
 	PrintConsumedUTXOs(selectedUTXOs)
@@ -1362,6 +1745,8 @@ func (w *Wallet) createTransactionMLPByRootSeeds(
 		privacyLevelOfSelectedUTXO := abecryptoxkey.PrivacyLevelRINGCT
 		if selectedUTXOs[i].IsPseudonymous() {
 			privacyLevelOfSelectedUTXO = abecryptoxkey.PrivacyLevelPSEUDONYM
+		} else if selectedUTXOs[i].IsPseudonymousCT() {
+			privacyLevelOfSelectedUTXO = abecryptoxkey.PrivacyLevelPSEUDONYMCT
 		}
 
 		txIns[i] = &wire.TxInAbe{
@@ -1453,7 +1838,20 @@ func (w *Wallet) createTransactionMLPByRootSeeds(
 	sort.SliceStable(txOutDescs, func(i, j int) bool {
 		outputIAddressPrivacyLevel, _, _, _ := abecryptoxkey.CryptoAddressParse(txOutDescs[i].CryptoAddress())
 		outputJAddressPrivacyLevel, _, _, _ := abecryptoxkey.CryptoAddressParse(txOutDescs[j].CryptoAddress())
-		if outputIAddressPrivacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM && outputJAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM {
+
+		isPseudonymousI := outputIAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM || outputIAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT
+		isPseudonymousJ := outputJAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM || outputJAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT
+		if isPseudonymousI && !isPseudonymousJ {
+			return false
+		}
+		if !isPseudonymousI && isPseudonymousJ {
+			return true
+		}
+		if !isPseudonymousI && !isPseudonymousJ {
+			return false
+		}
+		if outputIAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT &&
+			outputJAddressPrivacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
 			return true
 		}
 		return false
@@ -2180,6 +2578,30 @@ func (w *Wallet) findEligibleTxosAbeAUT(txmgrNs walletdb.ReadBucket, minconf int
 	// the desired account, this change depends on making wtxmgr a waddrmgr
 	// dependancy and requesting unspent outputs for a single account.
 	eligible := make([]*wtxmgr.AUTCoin, 0, len(unspent))
+	for i := range unspent {
+		output := unspent[i]
+
+		if output.Spent {
+			continue
+		}
+
+		eligible = append(eligible, output)
+	}
+	return eligible, nil
+}
+
+func (w *Wallet) findEligibleTxosAbeCTAUT(txmgrNs walletdb.ReadBucket, minconf int32, bs *waddrmgr.BlockStamp, identifier []byte) ([]*wtxmgr.CTAUTCoin, error) {
+	unspent, _, err := w.TxStore.UnspentOutputsCTAUT(txmgrNs, identifier, false) // In ABE, this result will be spendable for the logic of store
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Eventually all of these filters (except perhaps output locking)
+	// should be handled by the call to UnspentOutputs (or similar).
+	// Because one of these filters requires matching the output script to
+	// the desired account, this change depends on making wtxmgr a waddrmgr
+	// dependancy and requesting unspent outputs for a single account.
+	eligible := make([]*wtxmgr.CTAUTCoin, 0, len(unspent))
 	for i := range unspent {
 		output := unspent[i]
 

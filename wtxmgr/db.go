@@ -5,12 +5,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abewalletmlp/walletdb"
-	"reflect"
-	"time"
 )
 
 // Naming
@@ -79,6 +80,9 @@ var (
 	bucketAUTPoint              = []byte("autpoint") // outpoint -> aut coin
 	bucketBlockDisabledAUTPoint = []byte("blockdisabledautpoints")
 
+	bucketCTAUTPoint              = []byte("ctautpoint") // outpoint -> aut coin
+	bucketBlockDisabledCTAUTPoint = []byte("blockdisabledctautpoints")
+
 	bucketUTXORing    = []byte("utxoring")
 	bucketRingDetails = []byte("utxoringdetails") //TODO(abe):we should add a block height in database, meaning that the txo in ring had consumed completely .
 
@@ -112,6 +116,18 @@ var (
 	rootAUTUnconfirmedBalance      = []byte("autunconfirmedbal") // spendable balance for aut
 
 	rootAUTFreezedBalance = []byte("autfreezedbal") // freeze balance for aut, this type balance for aut is not supported now
+
+	rootCTAUTBalance                = []byte("ctautbal")              // total balance for aut
+	rootCTAUTImmatureRootCoinNum    = []byte("ctautimmaturecbnum")    // immature transfer balance for aut
+	rootCTAUTSpendableRootCoinNum   = []byte("ctautspendablecbnum")   // spendable balance for aut
+	rootCTAUTUnconfirmedRootCoinNum = []byte("ctautunconfirmedcbnum") // spendable balance for aut
+
+	rootCTAUTRootCoinNum             = []byte("ctautcbnum")          // total balance for aut
+	rootCTAUTImmatureTransferBalance = []byte("ctautimmaturetrbal")  // immature transfer balance for aut
+	rootCTAUTSpendableBalance        = []byte("ctautspendablebal")   // spendable balance for aut
+	rootCTAUTUnconfirmedBalance      = []byte("ctautunconfirmedbal") // spendable balance for aut
+
+	rootCTAUTFreezedBalance = []byte("ctautfreezedbal") // freeze balance for aut, this type balance for aut is not supported now
 )
 
 // The root bucket's mined balance k/v pair records the total balance for all
@@ -327,11 +343,13 @@ func putBlockRecord(ns walletdb.ReadWriteBucket, block *BlockRecord) error {
 	if err != nil {
 		panic("MsgBlockAbe has unmatched serialization/deserialization ")
 	}
-	record, err := NewBlockRecordFromMsgBlock(res)
+	var tmp bytes.Buffer
+
+	err = res.Serialize(&tmp)
 	if err != nil {
 		panic("MsgBlockAbe has unmatched serialization/deserialization ")
 	}
-	if !reflect.DeepEqual(block, record) {
+	if !reflect.DeepEqual(tmp.Bytes(), v) {
 		panic("MsgBlockAbe has unmatched serialization/deserialization ")
 	}
 
@@ -2186,6 +2204,15 @@ func createBuckets(ns walletdb.ReadWriteBucket) error {
 		return storeError(ErrDatabase, str, err)
 	}
 
+	if _, err := ns.CreateBucket(bucketCTAUTPoint); err != nil {
+		str := "failed to create aut point bucket"
+		return storeError(ErrDatabase, str, err)
+	}
+	if _, err := ns.CreateBucket(bucketBlockDisabledCTAUTPoint); err != nil {
+		str := "failed to create block disbaled aut point bucket"
+		return storeError(ErrDatabase, str, err)
+	}
+
 	return nil
 }
 
@@ -2261,6 +2288,15 @@ func deleteBuckets(ns walletdb.ReadWriteBucket) error {
 		return storeError(ErrDatabase, str, err)
 	}
 	if err := ns.DeleteNestedBucket(bucketBlockDisabledAUTPoint); err != nil {
+		str := "failed to delete block disabled aut point bucket"
+		return storeError(ErrDatabase, str, err)
+	}
+
+	if err := ns.DeleteNestedBucket(bucketCTAUTPoint); err != nil {
+		str := "failed to delete aut point bucket"
+		return storeError(ErrDatabase, str, err)
+	}
+	if err := ns.DeleteNestedBucket(bucketBlockDisabledCTAUTPoint); err != nil {
 		str := "failed to delete block disabled aut point bucket"
 		return storeError(ErrDatabase, str, err)
 	}
