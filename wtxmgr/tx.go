@@ -1565,11 +1565,11 @@ func (s *Store) ReceiveCTAUTToken(txOut *wire.TxOutAbe, ctautTxo *ctautwire.AutT
 	if err != nil {
 		return 0, err
 	}
-	coinValuePublicKey, coinSecretKey, err := abecryptoxkey.CoinValueKeyReGenByRootSeedsFromPublicRand(
+	cryptoValuePublicKey, cryptoValueSecretKey, err := abecryptoxkey.CryptoValueKeyReGenByRootSeedsFromPublicRand(
 		abecryptoxparam.CryptoSchemePQRingCTX,
 		abecryptoxkey.PrivacyLevelPSEUDONYMCT,
 		valueRootSeed, publicRand)
-	return abecryptox.ExtractAutTxoValue(ctautTxo, coinValuePublicKey, coinSecretKey)
+	return abecryptox.ExtractAutTxoValue(ctautTxo, cryptoValuePublicKey, cryptoValueSecretKey)
 }
 func (s *Store) GenSNForTxo(txOut *wire.TxOutAbe, addrMgrNs walletdb.ReadWriteBucket, ringHash chainhash.Hash, index uint8) ([]byte, error) {
 	coinAddr, err := abecryptox.ExtractCoinAddressFromTxo(txOut)
@@ -2075,7 +2075,12 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 				if ctAUTScript != nil {
 					identifier := ctAUTScript.Identifier()
 					generatedTokens := ctAUTScript.GeneratedTokens()
-					for t := 0; t < len(generatedTokens); t++ {
+
+					startIdx := 0
+					if ctAUTScript.Type() == ctaut.Burn {
+						startIdx = 1
+					}
+					for t := startIdx; t < len(generatedTokens); t++ {
 						token := generatedTokens[t]
 						if token.HostOutPoint.Index == uint32(j) {
 							tmp.PackedFlag |= txoFlagCTAUTCoin

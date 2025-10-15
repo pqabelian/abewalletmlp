@@ -2259,12 +2259,21 @@ func (w *Wallet) GetCTAUTOutpointsForTransfer(identifier []byte, target uint64) 
 			if err != nil {
 				return err
 			}
-			coinValuePublicKey, coinValueSecretKey, err := abecryptoxkey.CoinValueKeyReGenByRootSeedsFromPublicRand(
+			cryptoValuePublicKey, cryptoValueSecretKey, err := abecryptoxkey.CryptoValueKeyReGenByRootSeedsFromPublicRand(
 				abecryptoxparam.CryptoSchemePQRingCTX, abecryptoxkey.PrivacyLevelPSEUDONYMCT,
 				valueRootSeed, token.PublicRand)
 			if err != nil {
 				return err
 			}
+			_, coinValuePublicKey, err := abecryptoxkey.CryptoValuePublicKeyParse(cryptoValuePublicKey)
+			if err != nil {
+				return err
+			}
+			_, coinValueSecretKey, err := abecryptoxkey.CryptoValueSecretKeyParse(cryptoValueSecretKey)
+			if err != nil {
+				return err
+			}
+
 			autTxInputDesc := abecryptox.NewAutTxInputDesc(autTxo, coinValuePublicKey, coinValueSecretKey, token.Value)
 			autTxInputDescs = append(autTxInputDescs, autTxInputDesc)
 			hostedOutpoints = append(hostedOutpoints, &wire.OutPointAbe{
