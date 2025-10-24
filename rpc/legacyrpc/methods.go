@@ -2520,7 +2520,7 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	scriptWitness := autTransferTx.TxWitness
 	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
 
-	autScript := ctaut.NewBurnTx(identifier,
+	autScript := ctaut.NewBurnScript(identifier,
 		inCTAUTTokenNum, inPlainAUTTokenNum,
 		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
 		witnessHash, []byte(cmd.Memo))
