@@ -131,8 +131,8 @@ type Wallet struct {
 	// call the rescan RPC.
 
 	// Channel for transaction creation requests.
-	createTxRequests      chan createTxRequest
-	createTxAUTRequests   chan createTxAUTRequest
+	createTxRequests chan createTxRequest
+	//createTxAUTRequests   chan createTxAUTRequest
 	createTxCTAUTRequests chan createTxCTAUTRequest
 
 	// Channels for the manager locker.
@@ -723,17 +723,17 @@ out:
 
 			heldUnlock.release()
 			txr.resp <- createTxResponse{tx, err}
-		case txr := <-w.createTxAUTRequests:
-			heldUnlock, err := w.holdUnlock()
-			if err != nil {
-				txr.resp <- createTxAUTResponse{nil, err}
-				continue
-			}
-
-			tx, err := w.txPqringCTToOutputsMLPAUT(txr.autTransaction, txr.txOutDescs, txr.minconf, txr.feePerKbSpecified, txr.autIssueTokenThreshold, txr.autIssueUpdateThreshold, txr.utxoSpecified)
-
-			heldUnlock.release()
-			txr.resp <- createTxAUTResponse{tx, err}
+		//case txr := <-w.createTxAUTRequests:
+		//	heldUnlock, err := w.holdUnlock()
+		//	if err != nil {
+		//		txr.resp <- createTxAUTResponse{nil, err}
+		//		continue
+		//	}
+		//
+		//	tx, err := w.txPqringCTToOutputsMLPAUT(txr.autTransaction, txr.txOutDescs, txr.minconf, txr.feePerKbSpecified, txr.autIssueTokenThreshold, txr.autIssueUpdateThreshold, txr.utxoSpecified)
+		//
+		//	heldUnlock.release()
+		//	txr.resp <- createTxAUTResponse{tx, err}
 		case txr := <-w.createTxCTAUTRequests:
 			heldUnlock, err := w.holdUnlock()
 			if err != nil {
@@ -787,23 +787,24 @@ func (w *Wallet) CreateSimpleTx(outputDescs []*abecryptox.AbeTxOutputDesc, minco
 	return resp.tx, resp.err
 }
 
-func (w *Wallet) CreateSimpleTxAUT(autTransaction aut.Transaction, outputDescs []*abecryptox.AbeTxOutputDesc, minconf int32,
-	feePerKbSpecified abeutil.Amount, autIssueTokenThreshold uint8, autIssueUpdateThreshold uint8, utxoSpecified []string) (*txauthor.AuthoredTxAbe, error) {
-
-	req := createTxAUTRequest{
-		autTransaction:          autTransaction,
-		txOutDescs:              outputDescs,
-		minconf:                 minconf,
-		feePerKbSpecified:       feePerKbSpecified,
-		autIssueTokenThreshold:  autIssueTokenThreshold,
-		autIssueUpdateThreshold: autIssueUpdateThreshold,
-		resp:                    make(chan createTxAUTResponse),
-		utxoSpecified:           utxoSpecified,
-	}
-	w.createTxAUTRequests <- req
-	resp := <-req.resp
-	return resp.tx, resp.err
-}
+// func (w *Wallet) CreateSimpleTxAUT(autTransaction aut.Transaction, outputDescs []*abecryptox.AbeTxOutputDesc, minconf int32,
+//
+//		feePerKbSpecified abeutil.Amount, autIssueTokenThreshold uint8, autIssueUpdateThreshold uint8, utxoSpecified []string) (*txauthor.AuthoredTxAbe, error) {
+//
+//		req := createTxAUTRequest{
+//			autTransaction:          autTransaction,
+//			txOutDescs:              outputDescs,
+//			minconf:                 minconf,
+//			feePerKbSpecified:       feePerKbSpecified,
+//			autIssueTokenThreshold:  autIssueTokenThreshold,
+//			autIssueUpdateThreshold: autIssueUpdateThreshold,
+//			resp:                    make(chan createTxAUTResponse),
+//			utxoSpecified:           utxoSpecified,
+//		}
+//		//w.createTxAUTRequests <- req
+//		resp := <-req.resp
+//		return resp.tx, resp.err
+//	}
 func (w *Wallet) CreateSimpleTxCTAUT(script []byte, scriptWitness []byte,
 	outputDescs []*abecryptox.AbeTxOutputDesc,
 	minconf int32, feePerKbSpecified abeutil.Amount,
@@ -1080,7 +1081,7 @@ func (w *Wallet) CalculateBalance(confirms int32) ([]abeutil.Amount, []map[strin
 		if err != nil {
 			return err
 		}
-		autBalances, err = w.TxStore.AUTBalance(txmgrNs, confirms, blk.Height)
+		autBalances, err = w.TxStore.CTAUTBalance(txmgrNs, confirms, blk.Height)
 		if err != nil {
 			return err
 		}
@@ -1737,51 +1738,52 @@ func (w *Wallet) SendOutputsAUT(autTransaction aut.Transaction, outputDescs []*a
 	minconf int32, feePerKbSpecified abeutil.Amount, autIssueTokenThreshold uint8, autIssueUpdateThreshold uint8, utxoSpecified []string) (*txauthor.AuthoredTxAbe, error) {
 	// Ensure the outputs to be created adhere to the network's consensus
 	// rules.
-	for _, txOutDesc := range outputDescs {
-		err := txrules.CheckOutputDescAbe(
-			txOutDesc, txrules.DefaultRelayFeePerKb,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
+	//for _, txOutDesc := range outputDescs {
+	//	err := txrules.CheckOutputDescAbe(
+	//		txOutDesc, txrules.DefaultRelayFeePerKb,
+	//	)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//}
+	return nil, errors.New("AUT is not supported, please use CT-AUT")
 
 	// Create the transaction and broadcast it to the network. The
 	// transaction will be added to the database in order to ensure that we
 	// continue to re-broadcast the transaction upon restarts until it has
 	// been confirmed.
-	createdTx, err := w.CreateSimpleTxAUT(autTransaction, outputDescs, minconf, feePerKbSpecified, autIssueTokenThreshold, autIssueUpdateThreshold, utxoSpecified)
-	if err != nil {
-		return nil, err
-	}
+	//createdTx, err := w.CreateSimpleTxAUT(autTransaction, outputDescs, minconf, feePerKbSpecified, autIssueTokenThreshold, autIssueUpdateThreshold, utxoSpecified)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	// it means that the transaction is created successful
-	txHash, err := w.reliablyPublishTransaction(createdTx.Tx, "", nil)
-	if err != nil {
-		// the wallet would fetch the transaction
-		// due to error double spending
-		// And then insert the transaction into database
-		// But current do nothing? TODO 202207
-		if _, ok := err.(*ErrDoubleSpend); ok {
-			// do nothing
-		}
-		return nil, err
-	}
+	//txHash, err := w.reliablyPublishTransaction(createdTx.Tx, "", nil)
+	//if err != nil {
+	//	// the wallet would fetch the transaction
+	//	// due to error double spending
+	//	// And then insert the transaction into database
+	//	// But current do nothing? TODO 202207
+	//	if _, ok := err.(*ErrDoubleSpend); ok {
+	//		// do nothing
+	//	}
+	//	return nil, err
+	//}
 
-	for i := 0; i < len(createdTx.Tx.TxOuts); i++ {
-		printedLength := len(createdTx.Tx.TxOuts[i].TxoScript)
-		if printedLength > 64 {
-			printedLength = 64
-		}
-		log.Debugf("tx output [%d] = %x\n", i, createdTx.Tx.TxOuts[i].TxoScript[:printedLength])
-	}
-	// Sanity check on the returned tx hash.
-	// something error ?
-	if *txHash != createdTx.Tx.TxHash() {
-		return nil, errors.New("tx hash mismatch")
-	}
-
-	return createdTx, nil
+	//for i := 0; i < len(createdTx.Tx.TxOuts); i++ {
+	//	printedLength := len(createdTx.Tx.TxOuts[i].TxoScript)
+	//	if printedLength > 64 {
+	//		printedLength = 64
+	//	}
+	//	log.Debugf("tx output [%d] = %x\n", i, createdTx.Tx.TxOuts[i].TxoScript[:printedLength])
+	//}
+	//// Sanity check on the returned tx hash.
+	//// something error ?
+	//if *txHash != createdTx.Tx.TxHash() {
+	//	return nil, errors.New("tx hash mismatch")
+	//}
+	//
+	//return createdTx, nil
 }
 
 func (w *Wallet) SendOutputsCTAUT(
@@ -2250,18 +2252,19 @@ func (w *Wallet) GetCTAUTOutpointsForTransfer(identifier []byte, target uint64) 
 			addrKeyMapping[hex.EncodeToString(token.AddrKey)] = struct{}{}
 			selectedValue += token.Value
 
-			autTxo := &ctautwire.AutTxo{
-				Version:   wire.TxVersion, // TODO: add version field to CTAUTCoin
-				TxoScript: token.CoinValueScript,
+			autTxo := &ctautwire.AutTxo{}
+			err = autTxo.Deserialize(bytes.NewReader(token.CoinValueScript))
+			if err != nil {
+				return err
 			}
 
-			_, _, valueRootSeed, _, err := w.Manager.FetchProtectedRootSeeds(addrmgrNs)
+			_, _, _, _, coinValueRootSeedAut, err := w.Manager.FetchProtectedRootSeeds(addrmgrNs)
 			if err != nil {
 				return err
 			}
 			cryptoValuePublicKey, cryptoValueSecretKey, err := abecryptoxkey.CryptoValueKeyReGenByRootSeedsFromPublicRand(
 				abecryptoxparam.CryptoSchemePQRingCTX, abecryptoxkey.PrivacyLevelPSEUDONYMCT,
-				valueRootSeed, token.PublicRand)
+				coinValueRootSeedAut, token.PublicRand)
 			if err != nil {
 				return err
 			}
@@ -2387,15 +2390,15 @@ func Open(db walletdb.DB, pubPass []byte, cbs *waddrmgr.OpenCallbacks,
 	log.Infof("Opened wallet") // TODO: log balance? last sync height?
 
 	w := &Wallet{
-		publicPassphrase:      pubPass,
-		db:                    db,
-		Manager:               addrMgr,
-		TxStore:               txMgr,
-		lockedOutpoints:       map[wire.OutPoint]struct{}{},
-		resendUnminedTxFlag:   atomic.Value{},
-		recoveryWindow:        recoveryWindow,
-		createTxRequests:      make(chan createTxRequest),
-		createTxAUTRequests:   make(chan createTxAUTRequest),
+		publicPassphrase:    pubPass,
+		db:                  db,
+		Manager:             addrMgr,
+		TxStore:             txMgr,
+		lockedOutpoints:     map[wire.OutPoint]struct{}{},
+		resendUnminedTxFlag: atomic.Value{},
+		recoveryWindow:      recoveryWindow,
+		createTxRequests:    make(chan createTxRequest),
+		//createTxAUTRequests:   make(chan createTxAUTRequest),
 		createTxCTAUTRequests: make(chan createTxCTAUTRequest),
 		unlockRequests:        make(chan unlockRequest),
 		lockRequests:          make(chan struct{}),

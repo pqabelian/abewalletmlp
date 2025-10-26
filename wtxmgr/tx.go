@@ -582,9 +582,10 @@ func (txo *SpendableTXO) IsCoinbase() bool {
 func (txo *SpendableTXO) IsPseudonymous() bool {
 	return txo.PackedFlag&txoFlagPseudonymous == txoFlagPseudonymous
 }
-func (txo *SpendableTXO) IsAUTCoin() bool {
-	return txo.PackedFlag&txoFlagAUTCoin == txoFlagAUTCoin
-}
+
+//	func (txo *SpendableTXO) IsAUTCoin() bool {
+//		return txo.PackedFlag&txoFlagAUTCoin == txoFlagAUTCoin
+//	}
 func (txo *SpendableTXO) IsPseudonymousCT() bool {
 	return txo.PackedFlag&txoFlagPseudonymousCT == txoFlagPseudonymousCT
 }
@@ -1380,23 +1381,23 @@ func (s *Store) InsertTx(wtxmgrNs walletdb.ReadWriteBucket, rec *TxRecord, block
 					return err
 				}
 			} else {
-				autSpendableBals, err := fetchCTAUTSpenableBalance(wtxmgrNs)
+				ctautSpendableBals, err := fetchCTAUTSpenableBalance(wtxmgrNs)
 				if err != nil {
 					return err
 				}
-				autUnconfirmedBals, err := fetchCTAUTUnconfirmedBalance(wtxmgrNs)
+				ctautUnconfirmedBals, err := fetchCTAUTUnconfirmedBalance(wtxmgrNs)
 				if err != nil {
 					return err
 				}
 
-				autSpendableBals[hex.EncodeToString(autCoin.AUTIdentifier)] -= autCoin.Value
-				autUnconfirmedBals[hex.EncodeToString(autCoin.AUTIdentifier)] += autCoin.Value
+				ctautSpendableBals[hex.EncodeToString(autCoin.AUTIdentifier)] -= autCoin.Value
+				ctautUnconfirmedBals[hex.EncodeToString(autCoin.AUTIdentifier)] += autCoin.Value
 
-				err = putAUTSpenableBalance(wtxmgrNs, autSpendableBals)
+				err = putCTAUTSpenableBalance(wtxmgrNs, ctautSpendableBals)
 				if err != nil {
 					return err
 				}
-				err = putAUTUnconfirmedBalance(wtxmgrNs, autUnconfirmedBals)
+				err = putCTAUTUnconfirmedBalance(wtxmgrNs, ctautUnconfirmedBals)
 				if err != nil {
 					return err
 				}
@@ -1515,7 +1516,7 @@ func (s *Store) ReceiveTxo(txOut *wire.TxOutAbe, addrMgrNs walletdb.ReadWriteBuc
 		return false, 0, nil, nil, 0, nil
 	}
 
-	_, _, valueRootSeed, detectorRootKey, err := s.manager.FetchProtectedRootSeeds(addrMgrNs)
+	_, _, coinValueRootSeed, detectorRootKey, _, err := s.manager.FetchProtectedRootSeeds(addrMgrNs)
 	if err != nil {
 		return false, 0, nil, nil, privacyLevel, err
 	}
@@ -1529,7 +1530,7 @@ func (s *Store) ReceiveTxo(txOut *wire.TxOutAbe, addrMgrNs walletdb.ReadWriteBuc
 		return false, 0, nil, nil, privacyLevel, err
 	}
 
-	valid, v, err = abecryptox.TxoCoinReceiveByRootSeeds(txOut, valueRootSeed, detectorRootKey)
+	valid, v, err = abecryptox.TxoCoinReceiveByRootSeeds(txOut, coinValueRootSeed, detectorRootKey)
 	if err != nil {
 		return false, 0, nil, nil, privacyLevel, err
 	}
@@ -1556,7 +1557,7 @@ func (s *Store) ReceiveCTAUTToken(txOut *wire.TxOutAbe, ctautTxo *ctautwire.AutT
 		return 0, nil
 	}
 
-	_, _, valueRootSeed, _, err := s.manager.FetchProtectedRootSeeds(addrMgrNs)
+	_, _, _, _, coinValueRootSeedAut, err := s.manager.FetchProtectedRootSeeds(addrMgrNs)
 	if err != nil {
 		return 0, err
 	}
@@ -1568,7 +1569,7 @@ func (s *Store) ReceiveCTAUTToken(txOut *wire.TxOutAbe, ctautTxo *ctautwire.AutT
 	cryptoValuePublicKey, cryptoValueSecretKey, err := abecryptoxkey.CryptoValueKeyReGenByRootSeedsFromPublicRand(
 		abecryptoxparam.CryptoSchemePQRingCTX,
 		abecryptoxkey.PrivacyLevelPSEUDONYMCT,
-		valueRootSeed, publicRand)
+		coinValueRootSeedAut, publicRand)
 	return abecryptox.ExtractAutTxoValue(ctautTxo, cryptoValuePublicKey, cryptoValueSecretKey)
 }
 func (s *Store) GenSNForTxo(txOut *wire.TxOutAbe, addrMgrNs walletdb.ReadWriteBucket, ringHash chainhash.Hash, index uint8) ([]byte, error) {
@@ -1604,7 +1605,7 @@ func (s *Store) GenSNForTxo(txOut *wire.TxOutAbe, addrMgrNs walletdb.ReadWriteBu
 	}
 
 	// abecryptoxkey.PrivacyLevelRINGCT
-	_, snKeyRootSeed, _, _, err := s.manager.FetchProtectedRootSeeds(addrMgrNs)
+	_, snKeyRootSeed, _, _, _, err := s.manager.FetchProtectedRootSeeds(addrMgrNs)
 	if err != nil {
 		return nil, err
 	}
@@ -2017,7 +2018,17 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 							}
 						}
 					} else {
-						log.Errorf("Do not find txo in spendable txo bucket or unconfirmed txo bucket")
+						confirmedTxo, err = fetchConfirmedTXO(txMgrNs, utxoRing.TxHashes[t], utxoRing.OutputIndexes[t])
+						if err != nil {
+							return err
+						}
+						if confirmedTxo != nil {
+							confirmedTxo.SpentByHash = txhash
+							confirmedTxo.SpentTime = block.RecvTime
+							confirmedTxo.ConfirmTime = block.RecvTime
+							confirmedTxo.ConfirmedByBlockHash = block.Hash
+							log.Errorf("Do not find txo in spendable txo bucket or unconfirmed txo bucket, but find in confirmed txo bucket")
+						}
 					}
 					// move to spent and confirm bucket
 					if serializedTXO != nil {
@@ -2074,7 +2085,10 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 
 				if ctAUTScript != nil {
 					identifier := ctAUTScript.Identifier()
-					generatedTokens := ctAUTScript.GeneratedTokens()
+					generatedTokens, err := ctAUTScript.GeneratedTokens()
+					if err != nil {
+						return err
+					}
 
 					startIdx := 0
 					if ctAUTScript.Type() == ctaut.Burn {
@@ -2091,10 +2105,12 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 							var autTxoType abecryptox.AutTxoType
 							var value uint64
 							if !isAUTRootCoin {
-								ctautTxo := &ctautwire.AutTxo{
-									Version:   txi.Version,
-									TxoScript: token.ValueScript,
+								ctautTxo := &ctautwire.AutTxo{}
+								err = ctautTxo.Deserialize(bytes.NewReader(token.ValueScript))
+								if err != nil {
+									return err
 								}
+
 								autTxoType, err = abecryptox.GetAutTxoType(ctautTxo)
 								if err != nil {
 									return err
@@ -2164,7 +2180,7 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 	}
 
 	if len(disabledAUTPoints) != 0 {
-		err = putBlockDisabledAUTRootCoins(txMgrNs, block.Height, block.Hash, disabledAUTPoints)
+		err = putBlockDisabledCTAUTRootCoins(txMgrNs, block.Height, block.Hash, disabledAUTPoints)
 		if err != nil {
 			return err
 		}
@@ -2693,11 +2709,11 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 	if err != nil {
 		return err
 	}
-	err = putAUTUnconfirmedBalance(txMgrNs, ctautUnconfirmedBal)
+	err = putCTAUTUnconfirmedBalance(txMgrNs, ctautUnconfirmedBal)
 	if err != nil {
 		return err
 	}
-	err = putAUTMinedBalance(txMgrNs, ctautBalances)
+	err = putCTAUTMinedBalance(txMgrNs, ctautBalances)
 	if err != nil {
 		return err
 	}
@@ -2965,36 +2981,36 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 		return err
 	}
 
-	autBalances, err := fetchAUTMinedBalance(wtxmgrNs)
+	ctautBalances, err := fetchCTAUTMinedBalance(wtxmgrNs)
 	if err != nil {
 		return err
 	}
-	autSpendableBal, err := fetchAUTSpenableBalance(wtxmgrNs)
+	ctautSpendableBal, err := fetchCTAUTSpenableBalance(wtxmgrNs)
 	if err != nil {
 		return err
 	}
-	autImmatureBal, err := fetchAUTImmatureTransferBalance(wtxmgrNs)
+	ctautImmatureBal, err := fetchCTAUTImmatureTransferBalance(wtxmgrNs)
 	if err != nil {
 		return err
 	}
-	autUnconfirmedBal, err := fetchAUTUnconfirmedBalance(wtxmgrNs)
+	ctautUnconfirmedBal, err := fetchCTAUTUnconfirmedBalance(wtxmgrNs)
 	if err != nil {
 		return err
 	}
 
-	autRootCoinNum, err := fetchAUTRootCoinNum(wtxmgrNs)
+	ctautRootCoinNum, err := fetchCTAUTRootCoinNum(wtxmgrNs)
 	if err != nil {
 		return err
 	}
-	autImmatureRootCoinNum, err := fetchAUTImmatureRootCoinNum(wtxmgrNs)
+	ctautImmatureRootCoinNum, err := fetchCTAUTImmatureRootCoinNum(wtxmgrNs)
 	if err != nil {
 		return err
 	}
-	autSpendableRootCoinNum, err := fetchAUTSpenableRootCoinNum(wtxmgrNs)
+	ctautSpendableRootCoinNum, err := fetchCTAUTSpenableRootCoinNum(wtxmgrNs)
 	if err != nil {
 		return err
 	}
-	autUnconfirmedRootCoinNum, err := fetchAUTUnconfirmedRootCoinNum(wtxmgrNs)
+	ctautUnconfirmedRootCoinNum, err := fetchCTAUTUnconfirmedRootCoinNum(wtxmgrNs)
 	if err != nil {
 		return err
 	}
@@ -3085,24 +3101,24 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 						log.Infof("(Rollback) (ABEL) Transfer txo (version %08x, hash %s, index %d) in height %d (hash %s) with value %v (pseudonymous %t): spendable -> immature",
 							output.Version, output.TxOutput.TxHash, output.TxOutput.Index, blockHeight, blockHash, amt.ToABE(), output.IsPseudonymous())
 
-						if output.IsAUTCoin() {
-							autCoin, err := fetchRawAUTCoin(wtxmgrNs, output.TxOutput.TxHash, output.TxOutput.Index)
+						if output.IsCTAUTCoin() {
+							token, err := fetchRawCTAUTCoin(wtxmgrNs, output.TxOutput.TxHash, output.TxOutput.Index)
 							if err != nil {
 								return err
 							}
-							if autCoin.IsAUTRootCoin {
-								autSpendableRootCoinNum[string(autCoin.AUTIdentifier)] -= 1
-								autImmatureRootCoinNum[string(autCoin.AUTIdentifier)] += 1
+							if token.IsAUTRootCoin {
+								ctautSpendableRootCoinNum[hex.EncodeToString(token.AUTIdentifier)] -= 1
+								ctautImmatureRootCoinNum[hex.EncodeToString(token.AUTIdentifier)] += 1
 
-								log.Infof("(Rollback) (AUT) root coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s): spendable -> immature",
-									autCoin.TxOutput.TxHash, autCoin.TxOutput.Index, string(autCoin.AUTIdentifier), blockHeight, blockHash)
+								log.Infof("(Rollback) (CTAUT) root token (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s): spendable -> immature",
+									token.TxOutput.TxHash, token.TxOutput.Index, hex.EncodeToString(token.AUTIdentifier), blockHeight, blockHash)
 
 							} else {
-								autSpendableBal[string(autCoin.AUTIdentifier)] -= autCoin.AUTCoinValue
-								autImmatureBal[string(autCoin.AUTIdentifier)] += autCoin.AUTCoinValue
+								ctautSpendableBal[hex.EncodeToString(token.AUTIdentifier)] -= token.Value
+								ctautImmatureBal[hex.EncodeToString(token.AUTIdentifier)] += token.Value
 
-								log.Infof("(Rollback) (AUT) coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s) with value %v: spendable -> immature",
-									autCoin.TxOutput.TxHash, autCoin.TxOutput.Index, string(autCoin.AUTIdentifier), blockHeight, blockHash, autCoin.AUTCoinValue)
+								log.Infof("(Rollback) (CTAUT) token (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s) with value %v: spendable -> immature",
+									token.TxOutput.TxHash, token.TxOutput.Index, hex.EncodeToString(token.AUTIdentifier), blockHeight, blockHash, token.Value)
 							}
 						}
 
@@ -3159,28 +3175,28 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 						log.Infof("(Rollback) (ABEL) Transfer txo (version %08x, hash %s, index %d) in height %d (hash %s) with value %v (pseudonymous %t): spent but unmined -> immature",
 							output.Version, output.TxOutput.TxHash, output.TxOutput.Index, blockHeight, blockHash, amt.ToABE(), output.IsPseudonymous())
 
-						if output.IsAUTCoin() {
-							autCoin, err := fetchRawAUTCoin(wtxmgrNs, outpoint.TxHash, outpoint.Index)
+						if output.IsCTAUTCoin() {
+							token, err := fetchRawCTAUTCoin(wtxmgrNs, outpoint.TxHash, outpoint.Index)
 							if err != nil {
 								return err
 							}
-							if autCoin.IsAUTRootCoin {
-								autUnconfirmedRootCoinNum[string(autCoin.AUTIdentifier)] -= 1
-								autImmatureRootCoinNum[string(autCoin.AUTIdentifier)] += 1
+							if token.IsAUTRootCoin {
+								ctautUnconfirmedRootCoinNum[hex.EncodeToString(token.AUTIdentifier)] -= 1
+								ctautImmatureRootCoinNum[hex.EncodeToString(token.AUTIdentifier)] += 1
 
-								log.Infof("(Rollback) (AUT) root coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s): spent but unmined -> immature",
-									autCoin.TxOutput.TxHash, autCoin.TxOutput.Index, string(autCoin.AUTIdentifier), blockHeight, blockHash)
+								log.Infof("(Rollback) (CTAUT) root token (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s): spent but unmined -> immature",
+									token.TxOutput.TxHash, token.TxOutput.Index, hex.EncodeToString(token.AUTIdentifier), blockHeight, blockHash)
 
 							} else {
-								autUnconfirmedBal[string(autCoin.AUTIdentifier)] -= autCoin.AUTCoinValue
-								autImmatureBal[string(autCoin.AUTIdentifier)] += autCoin.AUTCoinValue
+								ctautUnconfirmedBal[hex.EncodeToString(token.AUTIdentifier)] -= token.Value
+								ctautImmatureBal[hex.EncodeToString(token.AUTIdentifier)] += token.Value
 
-								log.Infof("(Rollback) (AUT) coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s) with value %v: spent but unmined -> immature",
-									autCoin.TxOutput.TxHash, autCoin.TxOutput.Index, string(autCoin.AUTIdentifier), blockHeight, blockHash, autCoin.AUTCoinValue)
+								log.Infof("(Rollback) (CTAUT) coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s) with value %v: spent but unmined -> immature",
+									token.TxOutput.TxHash, token.TxOutput.Index, hex.EncodeToString(token.AUTIdentifier), blockHeight, blockHash, token.Value)
 							}
 
-							autCoin.Spent = false
-							err = putRawAUTCoin(wtxmgrNs, outpoint.TxHash, outpoint.Index, autCoin)
+							token.Spent = false
+							err = putRawCTAUTCoin(wtxmgrNs, outpoint.TxHash, outpoint.Index, token)
 							if err != nil {
 								return err
 							}
@@ -3240,28 +3256,28 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 						log.Infof("(Rollback) (ABEL) Transfer txo (version %08x, hash %s, index %d) in height %d (hash %s) with value %v (pseudonymous %t): spent and minded -> immature",
 							output.Version, output.TxOutput.TxHash, output.TxOutput.Index, blockHeight, blockHash, amt.ToABE(), output.IsPseudonymous())
 
-						if output.IsAUTCoin() {
-							autCoin, err := fetchRawAUTCoin(wtxmgrNs, outpoint.TxHash, outpoint.Index)
+						if output.IsCTAUTCoin() {
+							token, err := fetchRawCTAUTCoin(wtxmgrNs, outpoint.TxHash, outpoint.Index)
 							if err != nil {
 								return err
 							}
-							if autCoin.IsAUTRootCoin {
-								autUnconfirmedRootCoinNum[string(autCoin.AUTIdentifier)] -= 1
-								autImmatureRootCoinNum[string(autCoin.AUTIdentifier)] += 1
+							if token.IsAUTRootCoin {
+								ctautUnconfirmedRootCoinNum[hex.EncodeToString(token.AUTIdentifier)] -= 1
+								ctautImmatureRootCoinNum[hex.EncodeToString(token.AUTIdentifier)] += 1
 
-								log.Infof("(Rollback) (AUT) root coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s): spent and minded -> immature",
-									autCoin.TxOutput.TxHash, autCoin.TxOutput.Index, string(autCoin.AUTIdentifier), blockHeight, blockHash)
+								log.Infof("(Rollback) (CTAUT) root coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s): spent and minded -> immature",
+									token.TxOutput.TxHash, token.TxOutput.Index, hex.EncodeToString(token.AUTIdentifier), blockHeight, blockHash)
 
 							} else {
-								autUnconfirmedBal[string(autCoin.AUTIdentifier)] -= autCoin.AUTCoinValue
-								autImmatureBal[string(autCoin.AUTIdentifier)] += autCoin.AUTCoinValue
+								ctautUnconfirmedBal[hex.EncodeToString(token.AUTIdentifier)] -= token.Value
+								ctautImmatureBal[hex.EncodeToString(token.AUTIdentifier)] += token.Value
 
-								log.Infof("(Rollback) (AUT) coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s) with value %v: spent and minded -> immature",
-									autCoin.TxOutput.TxHash, autCoin.TxOutput.Index, string(autCoin.AUTIdentifier), blockHeight, blockHash, autCoin.AUTCoinValue)
+								log.Infof("(Rollback) (CTAUT) coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s) with value %v: spent and minded -> immature",
+									token.TxOutput.TxHash, token.TxOutput.Index, hex.EncodeToString(token.AUTIdentifier), blockHeight, blockHash, token.Value)
 							}
 
-							autCoin.Spent = false
-							err = putRawAUTCoin(wtxmgrNs, outpoint.TxHash, outpoint.Index, autCoin)
+							token.Spent = false
+							err = putRawCTAUTCoin(wtxmgrNs, outpoint.TxHash, outpoint.Index, token)
 							if err != nil {
 								return err
 							}
@@ -3403,28 +3419,28 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 				// TODO(abe) 20220728 whether remove all transaction whose inputs contains this output or not?
 				// when the output is removed from wallet.
 
-				if unspentUTXO.IsAUTCoin() {
+				if unspentUTXO.IsCTAUTCoin() {
 					k := canonicalOutPointAbe(outpointAbe.TxHash, outpointAbe.Index)
-					autCoin, err := fetchRawAUTCoin(wtxmgrNs, unspentUTXO.TxOutput.TxHash, unspentUTXO.TxOutput.Index)
+					token, err := fetchRawCTAUTCoin(wtxmgrNs, unspentUTXO.TxOutput.TxHash, unspentUTXO.TxOutput.Index)
 					if err != nil {
 						return err
 					}
-					if autCoin.IsAUTRootCoin {
-						autImmatureRootCoinNum[string(autCoin.AUTIdentifier)] -= 1
-						autRootCoinNum[string(autCoin.AUTIdentifier)] -= 1
+					if token.IsAUTRootCoin {
+						ctautImmatureRootCoinNum[hex.EncodeToString(token.AUTIdentifier)] -= 1
+						ctautRootCoinNum[hex.EncodeToString(token.AUTIdentifier)] -= 1
 
-						log.Infof("(Rollback) (AUT) root coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s): immature -> null",
-							autCoin.TxOutput.TxHash, autCoin.TxOutput.Index, string(autCoin.AUTIdentifier), i, blockHash)
+						log.Infof("(Rollback) (CTAUT) root coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s): immature -> null",
+							token.TxOutput.TxHash, token.TxOutput.Index, hex.EncodeToString(token.AUTIdentifier), i, blockHash)
 
 					} else {
-						autImmatureBal[string(autCoin.AUTIdentifier)] -= autCoin.AUTCoinValue
-						autBalances[string(autCoin.AUTIdentifier)] -= autCoin.AUTCoinValue
+						ctautImmatureBal[hex.EncodeToString(token.AUTIdentifier)] -= token.Value
+						ctautBalances[hex.EncodeToString(token.AUTIdentifier)] -= token.Value
 
-						log.Infof("(Rollback) (AUT) coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s) with value %v: immature -> null",
-							autCoin.TxOutput.TxHash, autCoin.TxOutput.Index, string(autCoin.AUTIdentifier), i, blockHash, autCoin.AUTCoinValue)
+						log.Infof("(Rollback) (CTAUT) coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s) with value %v: immature -> null",
+							token.TxOutput.TxHash, token.TxOutput.Index, hex.EncodeToString(token.AUTIdentifier), i, blockHash, token.Value)
 					}
 
-					err = deleteRawAUTCoin(wtxmgrNs, k)
+					err = deleteRawCTAUTCoin(wtxmgrNs, k)
 					if err != nil {
 						return err
 					}
@@ -3467,28 +3483,28 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 							log.Infof("(Rollback) (ABEL) Spent transfer txo (version %08x, hash %s, index %d) in height %d (hash %s) with value %v (pseudonymous %t): -> spendable",
 								scoutput.Version, scoutput.TxOutput.TxHash, scoutput.TxOutput.Index, i, blockHash, amt.ToABE(), scoutput.IsPseudonymous())
 
-							if scoutput.IsAUTCoin() {
-								autCoin, err := fetchRawAUTCoin(wtxmgrNs, scoutput.TxOutput.TxHash, scoutput.TxOutput.Index)
+							if scoutput.IsCTAUTCoin() {
+								token, err := fetchRawCTAUTCoin(wtxmgrNs, scoutput.TxOutput.TxHash, scoutput.TxOutput.Index)
 								if err != nil {
 									return err
 								}
-								if autCoin.IsAUTRootCoin {
-									autSpendableRootCoinNum[string(autCoin.AUTIdentifier)] += 1
-									autRootCoinNum[string(autCoin.AUTIdentifier)] += 1
+								if token.IsAUTRootCoin {
+									ctautSpendableRootCoinNum[hex.EncodeToString(token.AUTIdentifier)] += 1
+									ctautRootCoinNum[hex.EncodeToString(token.AUTIdentifier)] += 1
 
-									log.Infof("(Rollback) (AUT) root coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s): -> spendable",
-										autCoin.TxOutput.TxHash, autCoin.TxOutput.Index, string(autCoin.AUTIdentifier), i, blockHash)
+									log.Infof("(Rollback) (CTAUT) root coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s): -> spendable",
+										token.TxOutput.TxHash, token.TxOutput.Index, hex.EncodeToString(token.AUTIdentifier), i, blockHash)
 
 								} else {
-									autSpendableBal[string(autCoin.AUTIdentifier)] += autCoin.AUTCoinValue
-									autBalances[string(autCoin.AUTIdentifier)] += autCoin.AUTCoinValue
+									ctautSpendableBal[hex.EncodeToString(token.AUTIdentifier)] += token.Value
+									ctautBalances[hex.EncodeToString(token.AUTIdentifier)] += token.Value
 
-									log.Infof("(Rollback) (AUT) coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s) with value %v: -> spendable",
-										autCoin.TxOutput.TxHash, autCoin.TxOutput.Index, string(autCoin.AUTIdentifier), i, blockHash, autCoin.AUTCoinValue)
+									log.Infof("(Rollback) (CTAUT) coin (hash %s, index %d) for AUT (identifer %s) in height %d (hash %s) with value %v: -> spendable",
+										token.TxOutput.TxHash, token.TxOutput.Index, hex.EncodeToString(token.AUTIdentifier), i, blockHash, token.Value)
 								}
 
-								autCoin.Spent = false
-								err = putRawAUTCoin(wtxmgrNs, utxoRings[j].TxHashes[k], utxoRings[j].OutputIndexes[k], autCoin)
+								token.Spent = false
+								err = putRawCTAUTCoin(wtxmgrNs, utxoRings[j].TxHashes[k], utxoRings[j].OutputIndexes[k], token)
 								if err != nil {
 									return err
 								}
@@ -3566,28 +3582,28 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 								log.Infof("(Rollback) (ABEL) Transfer txo (version %08x, hash %s, index %d) spent in height %d (hash %s) with value %v (pseudonymous %t): -> spendable",
 									scoutput.Version, scoutput.TxOutput.TxHash, scoutput.TxOutput.Index, i, blockHash, amt.ToABE(), scoutput.IsPseudonymous())
 
-								if scoutput.IsAUTCoin() {
-									autCoin, err := fetchRawAUTCoin(wtxmgrNs, scoutput.TxOutput.TxHash, scoutput.TxOutput.Index)
+								if scoutput.IsCTAUTCoin() {
+									token, err := fetchRawCTAUTCoin(wtxmgrNs, scoutput.TxOutput.TxHash, scoutput.TxOutput.Index)
 									if err != nil {
 										return err
 									}
-									if autCoin.IsAUTRootCoin {
-										autSpendableRootCoinNum[string(autCoin.AUTIdentifier)] += 1
-										autRootCoinNum[string(autCoin.AUTIdentifier)] += 1
+									if token.IsAUTRootCoin {
+										ctautSpendableRootCoinNum[hex.EncodeToString(token.AUTIdentifier)] += 1
+										ctautRootCoinNum[hex.EncodeToString(token.AUTIdentifier)] += 1
 
-										log.Infof("(Rollback) (AUT) root coin (hash %s, index %d) for AUT (identifer %s) in %d (hash %s): -> spendable",
-											autCoin.TxOutput.TxHash, autCoin.TxOutput.Index, string(autCoin.AUTIdentifier), i, blockHash)
+										log.Infof("(Rollback) (CTAUT) root coin (hash %s, index %d) for AUT (identifer %s) in %d (hash %s): -> spendable",
+											token.TxOutput.TxHash, token.TxOutput.Index, hex.EncodeToString(token.AUTIdentifier), i, blockHash)
 
 									} else {
-										autSpendableBal[string(autCoin.AUTIdentifier)] += autCoin.AUTCoinValue
-										autBalances[string(autCoin.AUTIdentifier)] += autCoin.AUTCoinValue
+										ctautSpendableBal[hex.EncodeToString(token.AUTIdentifier)] += token.Value
+										ctautBalances[hex.EncodeToString(token.AUTIdentifier)] += token.Value
 
-										log.Infof("(Rollback) (AUT) coin (hash %s, index %d) for AUT (identifer %s) in %d (hash %s) with value %v: -> spendable",
-											autCoin.TxOutput.TxHash, autCoin.TxOutput.Index, string(autCoin.AUTIdentifier), i, blockHash, autCoin.AUTCoinValue)
+										log.Infof("(Rollback) (CTAUT) coin (hash %s, index %d) for AUT (identifer %s) in %d (hash %s) with value %v: -> spendable",
+											token.TxOutput.TxHash, token.TxOutput.Index, hex.EncodeToString(token.AUTIdentifier), i, blockHash, token.Value)
 									}
 
-									autCoin.Spent = false
-									err = putRawAUTCoin(wtxmgrNs, utxoRings[j].TxHashes[m], utxoRings[j].OutputIndexes[m], autCoin)
+									token.Spent = false
+									err = putRawCTAUTCoin(wtxmgrNs, utxoRings[j].TxHashes[m], utxoRings[j].OutputIndexes[m], token)
 									if err != nil {
 										return err
 									}
@@ -3677,23 +3693,23 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 			return fmt.Errorf("deleteRawBlockWithBlockHeight in rollback with err:%v", err)
 		}
 
-		disabledAUTPoints, err := fetchBlockDisabledAUTRootCoins(wtxmgrNs, keysWithHeight[i])
+		disabledAUTPoints, err := fetchBlockDisabledCTAUTRootCoins(wtxmgrNs, keysWithHeight[i])
 		if err != nil {
 			return err
 		}
 		for _, point := range disabledAUTPoints {
-			autRootCoin, err := restoreAUTCoin(wtxmgrNs, point.TxHash, point.Index)
+			autRootCoin, err := restoreCTAUTCoin(wtxmgrNs, point.TxHash, point.Index)
 			if err != nil {
 				return err
 			}
 
-			autRootCoinNum[string(autRootCoin.AUTIdentifier)] += 1
-			autSpendableRootCoinNum[string(autRootCoin.AUTIdentifier)] += 1
+			ctautRootCoinNum[hex.EncodeToString(autRootCoin.AUTIdentifier)] += 1
+			ctautSpendableRootCoinNum[hex.EncodeToString(autRootCoin.AUTIdentifier)] += 1
 
-			log.Infof("(Rollback) (AUT) Restore my aut root coin (identifer %s, hash %s, index %d) disabled by re-registration",
-				string(autRootCoin.AUTIdentifier), autRootCoin.TxOutput.TxHash, autRootCoin.TxOutput.Index)
+			log.Infof("(Rollback) (CTAUT) Restore my aut root coin (identifer %s, hash %s, index %d) disabled by re-registration",
+				hex.EncodeToString(autRootCoin.AUTIdentifier), autRootCoin.TxOutput.TxHash, autRootCoin.TxOutput.Index)
 		}
-		err = deleteBlockDisabledAUTRootCoins(wtxmgrNs, keysWithHeight[i])
+		err = deleteBlockDisabledCTAUTRootCoins(wtxmgrNs, keysWithHeight[i])
 		if err != nil {
 			return err
 		}
@@ -3944,36 +3960,36 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 		return err
 	}
 
-	err = putAUTImmatureRootCoinNum(wtxmgrNs, autImmatureRootCoinNum)
+	err = putCTAUTImmatureRootCoinNum(wtxmgrNs, ctautImmatureRootCoinNum)
 	if err != nil {
 		return err
 	}
-	err = putAUTSpenableRootCoinNum(wtxmgrNs, autSpendableRootCoinNum)
+	err = putCTAUTSpenableRootCoinNum(wtxmgrNs, ctautSpendableRootCoinNum)
 	if err != nil {
 		return err
 	}
-	err = putAUTUnconfirmedRootCoinNum(wtxmgrNs, autUnconfirmedRootCoinNum)
+	err = putCTAUTUnconfirmedRootCoinNum(wtxmgrNs, ctautUnconfirmedRootCoinNum)
 	if err != nil {
 		return err
 	}
-	err = putAUTRootCoinNum(wtxmgrNs, autRootCoinNum)
+	err = putCTAUTRootCoinNum(wtxmgrNs, ctautRootCoinNum)
 	if err != nil {
 		return err
 	}
 
-	err = putAUTImmatureTransferBalance(wtxmgrNs, autImmatureBal)
+	err = putCTAUTImmatureTransferBalance(wtxmgrNs, ctautImmatureBal)
 	if err != nil {
 		return err
 	}
-	err = putAUTSpenableBalance(wtxmgrNs, autSpendableBal)
+	err = putCTAUTSpenableBalance(wtxmgrNs, ctautSpendableBal)
 	if err != nil {
 		return err
 	}
-	err = putAUTUnconfirmedBalance(wtxmgrNs, autUnconfirmedBal)
+	err = putCTAUTUnconfirmedBalance(wtxmgrNs, ctautUnconfirmedBal)
 	if err != nil {
 		return err
 	}
-	err = putAUTMinedBalance(wtxmgrNs, autBalances)
+	err = putCTAUTMinedBalance(wtxmgrNs, ctautBalances)
 	if err != nil {
 		return err
 	}
@@ -4356,44 +4372,44 @@ func (s *Store) Balance(ns walletdb.ReadBucket, minConf int32, syncHeight int32)
 	return []abeutil.Amount{allBal, spendableBal, immatureCBBal, immatureTRBal, unconfirmdBal}, nil
 }
 
-func (s *Store) AUTBalance(ns walletdb.ReadBucket, minConf int32, syncHeight int32) ([]map[string]uint64, error) {
-	autBalances, err := fetchAUTMinedBalance(ns)
+func (s *Store) CTAUTBalance(ns walletdb.ReadBucket, minConf int32, syncHeight int32) ([]map[string]uint64, error) {
+	ctautBalances, err := fetchCTAUTMinedBalance(ns)
 	if err != nil {
 		return nil, err
 	}
-	autSpendableBal, err := fetchAUTSpenableBalance(ns)
+	ctautSpendableBal, err := fetchCTAUTSpenableBalance(ns)
 	if err != nil {
 		return nil, err
 	}
-	autImmatureTRBal, err := fetchAUTImmatureTransferBalance(ns)
+	ctautImmatureTRBal, err := fetchCTAUTImmatureTransferBalance(ns)
 	if err != nil {
 		return nil, err
 	}
-	autUnconfirmedBal, err := fetchAUTUnconfirmedBalance(ns)
+	ctautUnconfirmedBal, err := fetchCTAUTUnconfirmedBalance(ns)
 	if err != nil {
 		return nil, err
 	}
-	return []map[string]uint64{autBalances, autSpendableBal, autImmatureTRBal, autUnconfirmedBal}, nil
+	return []map[string]uint64{ctautBalances, ctautSpendableBal, ctautImmatureTRBal, ctautUnconfirmedBal}, nil
 }
 func (s *Store) AUTRootCoinNum(ns walletdb.ReadBucket, minConf int32, syncHeight int32) ([]map[string]uint64, error) {
-	autRootCoinNum, err := fetchAUTRootCoinNum(ns)
+	ctautRootCoinNum, err := fetchCTAUTRootCoinNum(ns)
 	if err != nil {
 		return nil, err
 	}
-	autImmatureRootCoinNum, err := fetchAUTImmatureRootCoinNum(ns)
+	ctautImmatureRootCoinNum, err := fetchCTAUTImmatureRootCoinNum(ns)
 	if err != nil {
 		return nil, err
 	}
-	autSpendableRootCoinNum, err := fetchAUTSpenableRootCoinNum(ns)
+	ctautSpendableRootCoinNum, err := fetchCTAUTSpenableRootCoinNum(ns)
 	if err != nil {
 		return nil, err
 	}
-	autUnconfirmedRootCoinNum, err := fetchAUTUnconfirmedRootCoinNum(ns)
+	ctautUnconfirmedRootCoinNum, err := fetchCTAUTUnconfirmedRootCoinNum(ns)
 	if err != nil {
 		return nil, err
 	}
 
-	return []map[string]uint64{autRootCoinNum, autImmatureRootCoinNum, autSpendableRootCoinNum, autUnconfirmedRootCoinNum}, nil
+	return []map[string]uint64{ctautRootCoinNum, ctautImmatureRootCoinNum, ctautSpendableRootCoinNum, ctautUnconfirmedRootCoinNum}, nil
 }
 
 // PutTxLabel validates transaction labels and writes them to disk if they

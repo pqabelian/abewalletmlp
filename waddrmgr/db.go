@@ -4,10 +4,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abewalletmlp/walletdb"
-	"time"
 )
 
 const (
@@ -249,6 +250,8 @@ var (
 	valueRootSeedKeyName = []byte("vkseed")
 	// detector root key
 	detectorRootKeyName = []byte("dkseed")
+	// value root seed for aut
+	valueRootSeedAutKeyName = []byte("vkseedaut")
 
 	// masterHDPubName is the name of the key that stores the master HD
 	// public key. This key is encrypted with the master public crypto
@@ -607,7 +610,18 @@ func putDetectorRootKeyEnc(ns walletdb.ReadWriteBucket, seedEnc []byte) error {
 	}
 	return nil
 }
+func putValueRootSeedAutEnc(ns walletdb.ReadWriteBucket, seedEnc []byte) error {
+	bucket := ns.NestedReadWriteBucket(mainBucketName)
 
+	if seedEnc != nil {
+		err := bucket.Put(valueRootSeedAutKeyName, seedEnc)
+		if err != nil {
+			str := "failed to store encrypted value root seed"
+			return managerError(ErrDatabase, str, err)
+		}
+	}
+	return nil
+}
 func fetchNetID(ns walletdb.ReadBucket) ([]byte, error) {
 	bucket := ns.NestedReadBucket(mainBucketName)
 	return bucket.Get(netIDName), nil
@@ -651,6 +665,17 @@ func fetchDetectorRootKeyEnc(ns walletdb.ReadBucket) ([]byte, error) {
 	var seedEnc []byte
 
 	key := bucket.Get(detectorRootKeyName)
+	if key != nil {
+		seedEnc = make([]byte, len(key))
+		copy(seedEnc[:], key)
+	}
+	return seedEnc, nil
+}
+func fetchValueRootSeedAutEnc(ns walletdb.ReadBucket) ([]byte, error) {
+	bucket := ns.NestedReadBucket(mainBucketName)
+	var seedEnc []byte
+
+	key := bucket.Get(valueRootSeedAutKeyName)
 	if key != nil {
 		seedEnc = make([]byte, len(key))
 		copy(seedEnc[:], key)

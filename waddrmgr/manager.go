@@ -447,46 +447,56 @@ func (m *Manager) FetchAddressKeyEncByAddrKey(ns walletdb.ReadBucket, addrKey []
 	return fetchAddressKeyEncByAddrKey(ns, addrKey)
 }
 
-func (m *Manager) FetchProtectedRootSeeds(ns walletdb.ReadBucket) ([]byte, []byte, []byte, []byte, error) {
+func (m *Manager) FetchProtectedRootSeeds(ns walletdb.ReadBucket) ([]byte, []byte, []byte, []byte, []byte, error) {
 	var spKeyRootSeed []byte
 	if !m.IsLocked() {
 		spKeyRootSeedEnc, err := fetchSpKeyRootSeedEnc(ns)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, nil, err
 		}
 		spKeyRootSeed, err = m.Decrypt(CKTSeed, spKeyRootSeedEnc)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, nil, err
 		}
 	}
 
 	snKeyRootSeedEnc, err := fetchSNKeyRootSeedEnc(ns)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	snKeyRootSeed, err := m.Decrypt(CKTPublic, snKeyRootSeedEnc)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	valueRootSeedEnc, err := fetchValueRootSeedEnc(ns)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	valueRootSeed, err := m.Decrypt(CKTPublic, valueRootSeedEnc)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	detectorRootKeyEnc, err := fetchDetectorRootKeyEnc(ns)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	detectorRootKey, err := m.Decrypt(CKTPublic, detectorRootKeyEnc)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
-	return spKeyRootSeed, snKeyRootSeed, valueRootSeed, detectorRootKey, nil
+
+	valueRootSeedAutEnc, err := fetchValueRootSeedAutEnc(ns)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	valueRootSeedAut, err := m.Decrypt(CKTPublic, valueRootSeedAutEnc)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	return spKeyRootSeed, snKeyRootSeed, valueRootSeed, detectorRootKey, valueRootSeedAut, nil
 }
 
 func (m *Manager) FetchNetID(ns walletdb.ReadBucket) ([]byte, error) {
@@ -553,12 +563,16 @@ func (m *Manager) GenerateAddressKeys(ns walletdb.ReadWriteBucket, privacyLevel 
 		return nil, nil, nil, nil, nil, nil, errors.New("wallet is locked")
 	}
 
-	spKeyRootSeed, snKeyRootSeed, valueRootSeed, detectorRootKey, err := m.FetchProtectedRootSeeds(ns)
+	spKeyRootSeed, snKeyRootSeed, valueRootSeed, detectorRootKey, valueRootSeedAut, err := m.FetchProtectedRootSeeds(ns)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, err
 	}
 
-	serializedCryptoAddress, serializedASksp, serializedASksn, serializedVSk, detectorKey, publicRand, err := generateAddressSKForPQRingCTX(m.cryptoScheme, privacyLevel, spKeyRootSeed, snKeyRootSeed, valueRootSeed, detectorRootKey)
+	serializedCryptoAddress, serializedASksp, serializedASksn, serializedVSk,
+		detectorKey, publicRand, err := generateAddressSKForPQRingCTX(m.cryptoScheme, privacyLevel,
+		spKeyRootSeed, snKeyRootSeed,
+		valueRootSeed, detectorRootKey,
+		valueRootSeedAut)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, fmt.Errorf("failed to generate address and key")
 	}
@@ -1360,7 +1374,39 @@ func Create(cryptoScheme abecryptoxparam.CryptoScheme,
 			return managerError(ErrCrypto, str, err)
 		}
 
-		coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, err := generateAccountRootSeedsForPQRingCTX(masterSeed, fromCLIWallet, CLIWalletVersion)
+		coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, coinValueKeyRootSeedAut, err := generateAccountRootSeedsForPQRingCTX(masterSeed, fromCLIWallet, CLIWalletVersion)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("coinSpendKeyRootSeed\n")
+		for i := 0; i < len(coinSpendKeyRootSeed); i++ {
+			fmt.Printf("%#02x, ", coinSpendKeyRootSeed[i])
+		}
+		fmt.Println()
+
+		fmt.Printf("coinSpendKeyRootSeed\n")
+		for i := 0; i < len(coinSerialNumberKeyRootSeed); i++ {
+			fmt.Printf("%#02x, ", coinSerialNumberKeyRootSeed[i])
+		}
+		fmt.Println()
+
+		fmt.Printf("coinValueKeyRootSeed\n")
+		for i := 0; i < len(coinValueKeyRootSeed); i++ {
+			fmt.Printf("%#02x, ", coinValueKeyRootSeed[i])
+		}
+		fmt.Println()
+
+		fmt.Printf("coinDetectorRootKey\n")
+		for i := 0; i < len(coinDetectorRootKey); i++ {
+			fmt.Printf("%#02x, ", coinDetectorRootKey[i])
+		}
+		fmt.Println()
+
+		fmt.Printf("coinValueKeyRootSeedAut\n")
+		for i := 0; i < len(coinValueKeyRootSeedAut); i++ {
+			fmt.Printf("%#02x, ", coinValueKeyRootSeedAut[i])
+		}
+		fmt.Println()
 
 		coinSpKeyRootSeedEnc, err := cryptoKeySeed.Encrypt(coinSpendKeyRootSeed)
 		if err != nil {
@@ -1394,6 +1440,15 @@ func Create(cryptoScheme abecryptoxparam.CryptoScheme,
 			return maybeConvertDbError(err)
 		}
 		err = putDetectorRootKeyEnc(ns, coinDetectorRootKeyEnc)
+		if err != nil {
+			return maybeConvertDbError(err)
+		}
+
+		coinValueKeyRootSeedAutEnc, err := cryptoKeyPub.Encrypt(coinValueKeyRootSeedAut)
+		if err != nil {
+			return maybeConvertDbError(err)
+		}
+		err = putValueRootSeedAutEnc(ns, coinValueKeyRootSeedAutEnc)
 		if err != nil {
 			return maybeConvertDbError(err)
 		}
@@ -1458,11 +1513,19 @@ func Create(cryptoScheme abecryptoxparam.CryptoScheme,
 }
 
 func generateAddressSKForPQRingCTX(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel abecryptoxkey.PrivacyLevel,
-	coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey []byte) ([]byte, []byte, []byte, []byte, []byte, []byte, error) {
+	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte,
+	coinValueKeyRootSeed []byte, coinDetectorRootKey []byte,
+	coinValueKeyRootSeedAut []byte) ([]byte, []byte, []byte, []byte, []byte, []byte, error) {
 	if cryptoScheme != abecryptoxparam.CryptoSchemePQRingCTX {
 		return nil, nil, nil, nil, nil, nil, errors.New("unsupported crypto scheme")
 	}
-	cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, err := abecryptoxkey.CryptoAddressKeyGenByRootSeeds(cryptoScheme, privacyLevel, coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey)
+
+	valueKeyRootSeed := coinValueKeyRootSeed
+	if privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+		valueKeyRootSeed = coinValueKeyRootSeedAut
+	}
+
+	cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, err := abecryptoxkey.CryptoAddressKeyGenByRootSeeds(cryptoScheme, privacyLevel, coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, valueKeyRootSeed, coinDetectorRootKey)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, err
 	}
@@ -1494,7 +1557,8 @@ func deriveSeed(key []byte, input string) ([]byte, error) {
 	return KDF(key, []byte(input))
 }
 
-func generateAccountRootSeedsForPQRingCTX(masterSeed []byte, fromCLIWallet bool, CLIWalletVersion string) ([]byte, []byte, []byte, []byte, error) {
+func generateAccountRootSeedsForPQRingCTX(masterSeed []byte, fromCLIWallet bool, CLIWalletVersion string) (
+	[]byte, []byte, []byte, []byte, []byte, error) {
 	if fromCLIWallet {
 		if CLIWalletVersion == "1.0.0" {
 			shake256 := sha3.NewShake256()
@@ -1527,44 +1591,47 @@ func generateAccountRootSeedsForPQRingCTX(masterSeed []byte, fromCLIWallet bool,
 			shake256.Write(tmp)
 			shake256.Read(coinDetectorRootKey)
 
-			return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, nil
+			return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, nil, nil
 		} else if CLIWalletVersion == "1.0.1" {
 			coinSpendKeyRootSeed, err := deriveSeed(masterSeed, "spendkey")
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, err
 			}
 			coinSerialNumberKeyRootSeed, err := deriveSeed(masterSeed, "serialnumberkey")
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, err
 			}
 			coinValueKeyRootSeed, err := deriveSeed(masterSeed, "valuekey")
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, err
 			}
 			coinDetectorRootKey, err := deriveSeed(masterSeed, "detectorkey")
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, err
 			}
 
-			return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, nil
+			return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, nil, nil
 		}
 	}
 
 	// follow aip-0011
 	accountRootSeeds, err := aip11.MasterSeedToAccountRootSeeds(masterSeed)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	// assert
 	if len(accountRootSeeds) != 4 {
-		return nil, nil, nil, nil, errors.New("fail to generate account seed")
+		return nil, nil, nil, nil, nil, errors.New("fail to generate account seed")
 	}
 	coinSpendKeyRootSeed := accountRootSeeds[0]
 	coinSerialNumberKeyRootSeed := accountRootSeeds[1]
 	coinValueKeyRootSeed := accountRootSeeds[3]
 	coinDetectorRootKey := accountRootSeeds[2]
+	// TODO(Aconcagua) update to aip-0015
+	//coinValueKeyRootSeedAut := accountRootSeeds[4]
+	coinValueKeyRootSeedAut := accountRootSeeds[3]
 
-	return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, nil
+	return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, coinValueKeyRootSeedAut, nil
 }
 
 func generateRootSeedForPQRingCT(originSeed []byte) ([]byte, error) {

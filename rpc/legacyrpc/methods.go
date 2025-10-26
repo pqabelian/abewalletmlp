@@ -734,6 +734,7 @@ type utxo struct {
 	FromCoinbase       bool
 	Pseudonymous       bool
 	IsAUTCoin          bool
+	IsCTAUTCoin        bool
 	Amount             uint64
 	Height             int32
 	UTXOHash           chainhash.Hash `json:"-"`
@@ -779,7 +780,7 @@ func listAllUTXOAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 			Index:        utxos[i].TxOutput.Index,
 			FromCoinbase: utxos[i].IsCoinbase(),
 			Pseudonymous: utxos[i].IsPseudonymous(),
-			IsAUTCoin:    utxos[i].IsAUTCoin(),
+			IsCTAUTCoin:  utxos[i].IsCTAUTCoin(),
 			Amount:       utxos[i].Amount,
 			Height:       utxos[i].Height,
 			UTXOHash:     utxos[i].Hash(),
@@ -793,7 +794,7 @@ func listAllUTXOAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 			Index:        unmatureds[i].TxOutput.Index,
 			FromCoinbase: unmatureds[i].IsCoinbase(),
 			Pseudonymous: unmatureds[i].IsPseudonymous(),
-			IsAUTCoin:    unmatureds[i].IsAUTCoin(),
+			IsCTAUTCoin:  unmatureds[i].IsCTAUTCoin(),
 			Amount:       unmatureds[i].Amount,
 			Height:       unmatureds[i].Height,
 			UTXOHash:     unmatureds[i].Hash(),
@@ -825,7 +826,7 @@ func listUnmaturedUTXOAbe(icmd interface{}, w *wallet.Wallet) (interface{}, erro
 			Index:        unmatureds[i].TxOutput.Index,
 			FromCoinbase: unmatureds[i].IsCoinbase(),
 			Pseudonymous: unmatureds[i].IsPseudonymous(),
-			IsAUTCoin:    unmatureds[i].IsAUTCoin(),
+			IsCTAUTCoin:  unmatureds[i].IsCTAUTCoin(),
 			Amount:       unmatureds[i].Amount,
 			Height:       unmatureds[i].Height,
 			UTXOHash:     unmatureds[i].Hash(),
@@ -858,7 +859,7 @@ func listUnspentAbe(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 			Index:        utxos[i].TxOutput.Index,
 			FromCoinbase: utxos[i].IsCoinbase(),
 			Pseudonymous: utxos[i].IsPseudonymous(),
-			IsAUTCoin:    utxos[i].IsAUTCoin(),
+			IsCTAUTCoin:  utxos[i].IsCTAUTCoin(),
 			Amount:       utxos[i].Amount,
 			Height:       utxos[i].Height,
 			UTXOHash:     utxos[i].Hash(),
@@ -888,7 +889,7 @@ func listUnspentCoinbaseAbe(icmd interface{}, w *wallet.Wallet) (interface{}, er
 				Index:        utxos[i].TxOutput.Index,
 				FromCoinbase: utxos[i].IsCoinbase(),
 				Pseudonymous: utxos[i].IsPseudonymous(),
-				IsAUTCoin:    utxos[i].IsAUTCoin(),
+				IsCTAUTCoin:  utxos[i].IsCTAUTCoin(),
 				Amount:       utxos[i].Amount,
 				Height:       utxos[i].Height,
 				UTXOHash:     utxos[i].Hash(),
@@ -920,7 +921,7 @@ func listSpentButUnminedAbe(icmd interface{}, w *wallet.Wallet) (interface{}, er
 			Index:            sbutxos[i].TxOutput.Index,
 			FromCoinbase:     sbutxos[i].IsCoinbase(),
 			Pseudonymous:     sbutxos[i].IsPseudonymous(),
-			IsAUTCoin:        sbutxos[i].IsAUTCoin(),
+			IsCTAUTCoin:      sbutxos[i].IsCTAUTCoin(),
 			Amount:           sbutxos[i].Amount,
 			Height:           sbutxos[i].Height,
 			UTXOHash:         sbutxos[i].Hash(),
@@ -955,7 +956,7 @@ func listSpentAndMinedAbe(icmd interface{}, w *wallet.Wallet) (interface{}, erro
 			Index:              sctxos[i].TxOutput.Index,
 			FromCoinbase:       sctxos[i].IsCoinbase(),
 			Pseudonymous:       sctxos[i].IsPseudonymous(),
-			IsAUTCoin:          sctxos[i].IsAUTCoin(),
+			IsCTAUTCoin:        sctxos[i].IsCTAUTCoin(),
 			Amount:             sctxos[i].Amount,
 			Height:             sctxos[i].Height,
 			UTXOHash:           sctxos[i].Hash(),
@@ -2084,6 +2085,8 @@ func burnAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 	return sendAddressAbeAUT(w, autTransaction, nil, 0, txrules.DefaultRelayFeePerKb, 0, 0, utxosSpecified)
 }
 
+var CTAUTVersion = wire.TxVersion_Height_450000_Aconcagua
+
 func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.RegisterCTAUTCmd)
 
@@ -2148,7 +2151,8 @@ func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		}
 	}
 
-	autScript := ctaut.NewRegistrationScript([]byte(cmd.CTAUTName), []byte(cmd.CTAUTSymbol),
+	autScript := ctaut.NewRegistrationScript(CTAUTVersion,
+		[]byte(cmd.CTAUTName), []byte(cmd.CTAUTSymbol),
 		[]byte(cmd.BaseUnitName), []byte(cmd.SubUnitName), cmd.UnitScale,
 		[]byte(cmd.CTAUTMemo), cmd.PlannedTotalAmount, issuerTokens,
 		cmd.MintThreshold, cmd.ReRegisterThreshold, cmd.ExpireHeight,
@@ -2227,7 +2231,8 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		return nil, err
 	}
 
-	autScript := ctaut.NewReRegistrationScript(identifier, []byte(cmd.CTAUTMemo),
+	autScript := ctaut.NewReRegistrationScript(CTAUTVersion,
+		identifier, []byte(cmd.CTAUTMemo),
 		cmd.PlannedTotalAmount, issuerTokens,
 		cmd.MintThreshold, cmd.ReRegisterThreshold, cmd.ExpireHeight,
 		uint8(len(hostedOutpoints)), uint8(len(outputs)), []byte(cmd.Memo))
@@ -2258,6 +2263,18 @@ func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// sort recipients
+	sort.SliceStable(cmd.Recipients, func(i, j int) bool {
+		if cmd.Recipients[i].Hidden && !cmd.Recipients[j].Hidden {
+			return true
+		}
+		if !cmd.Recipients[i].Hidden && cmd.Recipients[j].Hidden {
+			return false
+		}
+
+		return false
+	})
 
 	vin := uint64(0)
 	outCTAutTokenNum := uint8(0)
@@ -2314,13 +2331,20 @@ func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	}
 	valueScripts := make([][]byte, len(autCoinbaseTx.TxOuts))
 	for i := 0; i < len(autCoinbaseTx.TxOuts); i++ {
-		valueScripts[i] = autCoinbaseTx.TxOuts[i].TxoScript
+		autTxo := autCoinbaseTx.TxOuts[i]
+		buffer := bytes.NewBuffer(make([]byte, 0, autTxo.SerializeSize()))
+		err = autTxo.Serialize(buffer)
+		if err != nil {
+			return nil, err
+		}
+		valueScripts[i] = buffer.Bytes()
 	}
 
 	scriptWitness := autCoinbaseTx.TxWitness
 	witnessHash := chainhash.HashH(autCoinbaseTx.TxWitness)
 
-	autScript := ctaut.NewMintScript(identifier,
+	autScript := ctaut.NewMintScript(CTAUTVersion,
+		identifier,
 		vin, uint8(len(hostedOutpoints)),
 		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
 		witnessHash, []byte(cmd.Memo))
@@ -2347,6 +2371,18 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	var identifier [ctaut.CTAUTIdentifierLength]byte
 	copy(identifier[:], specifiedIdentifier[:])
 
+	// sort recipients
+	sort.SliceStable(cmd.Recipients, func(i, j int) bool {
+		if cmd.Recipients[i].Hidden && !cmd.Recipients[j].Hidden {
+			return true
+		}
+		if !cmd.Recipients[i].Hidden && cmd.Recipients[j].Hidden {
+			return false
+		}
+
+		return false
+	})
+
 	target := uint64(0)
 	outCTAutTokenNum := uint8(0)
 	outPlainAutTokenNum := uint8(0)
@@ -2414,13 +2450,20 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	}
 	valueScripts := make([][]byte, len(autTransferTx.TxOuts))
 	for i := 0; i < len(autTransferTx.TxOuts); i++ {
-		valueScripts[i] = autTransferTx.TxOuts[i].TxoScript
+		autTxo := autTransferTx.TxOuts[i]
+		buffer := bytes.NewBuffer(make([]byte, 0, autTxo.SerializeSize()))
+		err = autTxo.Serialize(buffer)
+		if err != nil {
+			return nil, err
+		}
+		valueScripts[i] = buffer.Bytes()
 	}
 
 	scriptWitness := autTransferTx.TxWitness
 	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
 
-	autScript := ctaut.NewTransferScript(identifier,
+	autScript := ctaut.NewTransferScript(CTAUTVersion,
+		identifier,
 		inCTAUTTokenNum, inPlainAUTTokenNum,
 		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
 		witnessHash, []byte(cmd.Memo))
@@ -2447,6 +2490,18 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	var identifier [ctaut.CTAUTIdentifierLength]byte
 	copy(identifier[:], specifiedIdentifier[:])
 
+	// sort recipients
+	sort.SliceStable(cmd.Recipients, func(i, j int) bool {
+		if cmd.Recipients[i].Hidden && !cmd.Recipients[j].Hidden {
+			return true
+		}
+		if !cmd.Recipients[i].Hidden && cmd.Recipients[j].Hidden {
+			return false
+		}
+
+		return false
+	})
+
 	target := uint64(0)
 	outCTAutTokenNum := uint8(0)
 	outPlainAutTokenNum := uint8(0)
@@ -2514,13 +2569,19 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	}
 	valueScripts := make([][]byte, len(autTransferTx.TxOuts))
 	for i := 0; i < len(autTransferTx.TxOuts); i++ {
-		valueScripts[i] = autTransferTx.TxOuts[i].TxoScript
+		autTxo := autTransferTx.TxOuts[i]
+		buffer := bytes.NewBuffer(make([]byte, 0, autTxo.SerializeSize()))
+		err = autTxo.Serialize(buffer)
+		if err != nil {
+			return nil, err
+		}
+		valueScripts[i] = buffer.Bytes()
 	}
 
 	scriptWitness := autTransferTx.TxWitness
 	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
 
-	autScript := ctaut.NewBurnScript(identifier,
+	autScript := ctaut.NewBurnScript(CTAUTVersion, identifier,
 		inCTAUTTokenNum, inPlainAUTTokenNum,
 		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
 		witnessHash, []byte(cmd.Memo))

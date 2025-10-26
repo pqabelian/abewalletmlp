@@ -3,6 +3,7 @@ package wtxmgr
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"reflect"
@@ -1385,19 +1386,19 @@ func ConfirmSpentTXO(ns walletdb.ReadWriteBucket, txHash chainhash.Hash, index u
 		return err
 	}
 
-	autRootCoinNums, err := fetchAUTRootCoinNum(ns)
+	ctautRootCoinNums, err := fetchCTAUTRootCoinNum(ns)
 	if err != nil {
 		return err
 	}
-	autSpendableRootCoinNums, err := fetchAUTSpenableRootCoinNum(ns)
+	ctautSpendableRootCoinNums, err := fetchCTAUTSpenableRootCoinNum(ns)
 	if err != nil {
 		return err
 	}
-	autBals, err := fetchAUTMinedBalance(ns)
+	ctautBals, err := fetchCTAUTMinedBalance(ns)
 	if err != nil {
 		return err
 	}
-	autSpendableBals, err := fetchAUTSpenableBalance(ns)
+	ctautSpendableBals, err := fetchCTAUTSpenableBalance(ns)
 	if err != nil {
 		return err
 	}
@@ -1421,17 +1422,17 @@ func ConfirmSpentTXO(ns walletdb.ReadWriteBucket, txHash chainhash.Hash, index u
 		scTxo.ConfirmedByBlockHash = confirmedByBlockHash
 		scTxo.ConfirmTime = time.Now()
 
-		if utxo.IsAUTCoin() {
-			autCoin, err := fetchRawAUTCoin(ns, utxo.TxOutput.TxHash, utxo.TxOutput.Index)
+		if utxo.IsCTAUTCoin() {
+			token, err := fetchRawCTAUTCoin(ns, utxo.TxOutput.TxHash, utxo.TxOutput.Index)
 			if err != nil {
 				return err
 			}
-			if autCoin.IsAUTRootCoin {
-				autSpendableRootCoinNums[string(autCoin.AUTIdentifier)] -= 1
-				autRootCoinNums[string(autCoin.AUTIdentifier)] -= 1
+			if token.IsAUTRootCoin {
+				ctautSpendableRootCoinNums[hex.EncodeToString(token.AUTIdentifier)] -= 1
+				ctautRootCoinNums[hex.EncodeToString(token.AUTIdentifier)] -= 1
 			} else {
-				autSpendableBals[string(autCoin.AUTIdentifier)] -= autCoin.AUTCoinValue
-				autBals[string(autCoin.AUTIdentifier)] -= autCoin.AUTCoinValue
+				ctautSpendableBals[hex.EncodeToString(token.AUTIdentifier)] -= token.Value
+				ctautBals[hex.EncodeToString(token.AUTIdentifier)] -= token.Value
 			}
 		}
 
@@ -1451,15 +1452,15 @@ func ConfirmSpentTXO(ns walletdb.ReadWriteBucket, txHash chainhash.Hash, index u
 		scTxo.ConfirmedByBlockHash = confirmedByBlockHash
 		scTxo.ConfirmTime = time.Now()
 
-		if sbuTxo.IsAUTCoin() {
-			autCoin, err := fetchRawAUTCoin(ns, sbuTxo.TxOutput.TxHash, sbuTxo.TxOutput.Index)
+		if sbuTxo.IsCTAUTCoin() {
+			token, err := fetchRawCTAUTCoin(ns, sbuTxo.TxOutput.TxHash, sbuTxo.TxOutput.Index)
 			if err != nil {
 				return err
 			}
-			if autCoin.IsAUTRootCoin {
-				autRootCoinNums[string(autCoin.AUTIdentifier)] -= 1
+			if token.IsAUTRootCoin {
+				ctautRootCoinNums[string(token.AUTIdentifier)] -= 1
 			} else {
-				autBals[string(autCoin.AUTIdentifier)] -= autCoin.AUTCoinValue
+				ctautBals[string(token.AUTIdentifier)] -= token.Value
 			}
 		}
 	} else {
@@ -1479,19 +1480,19 @@ func ConfirmSpentTXO(ns walletdb.ReadWriteBucket, txHash chainhash.Hash, index u
 	if err != nil {
 		return err
 	}
-	err = putAUTRootCoinNum(ns, autRootCoinNums)
+	err = putCTAUTRootCoinNum(ns, ctautRootCoinNums)
 	if err != nil {
 		return err
 	}
-	err = putAUTSpenableRootCoinNum(ns, autSpendableRootCoinNums)
+	err = putCTAUTSpenableRootCoinNum(ns, ctautSpendableRootCoinNums)
 	if err != nil {
 		return err
 	}
-	err = putAUTMinedBalance(ns, autBals)
+	err = putCTAUTMinedBalance(ns, ctautBals)
 	if err != nil {
 		return err
 	}
-	err = putAUTSpenableBalance(ns, autSpendableBals)
+	err = putCTAUTSpenableBalance(ns, ctautSpendableBals)
 	if err != nil {
 		return err
 	}
