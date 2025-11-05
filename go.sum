@@ -1,7 +1,7 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/abesuite/abec v1.0.1-0.20240812072406-02b5619f37b4 h1:xyPrIOrFjU2KmrqwQN2+m03mD5Bntp1MKH5n+xNtm8g=
-github.com/abesuite/abec v1.0.1-0.20240812072406-02b5619f37b4/go.mod h1:nnleGawj7tP0NEVdaC7rISUcvjdZWjooex8xBOr2mUA=
+github.com/abesuite/abec v1.0.1-0.20251104131003-1173e7f0c402 h1:mcjLuXufzwdRYpBdS1vrX1jyMPHI44yspZT/bclzBgw=
+github.com/abesuite/abec v1.0.1-0.20251104131003-1173e7f0c402/go.mod h1:CqMaTaBYZOcGaqCqbQDgKNwCMAeaD4vosk1iyVjAg1M=
 github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd h1:BNI2MkhhtofxM0sTP8WmdcT4chaAKZOsyhspB58DSrM=
 github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd/go.mod h1:eo8+6JwPaqdnrzzGmGXEH3nOYknOkk8GtuXw7Bo+f08=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
@@ -12,10 +12,10 @@ github.com/cryptosuite/kyber-go v0.0.2-alpha h1:JHvNqZho24qJq7c4JnyKGtyQuF03VOeE
 github.com/cryptosuite/kyber-go v0.0.2-alpha/go.mod h1:1G0Jh7bXJGSUCTrC6ZB9lFpmCF+VFQehDqIwm9dJU3s=
 github.com/cryptosuite/liboqs-go v0.9.5-alpha h1:mmCyD1gZRnm6sD214ylg0h17I37BmY8wDDbcvpW4fDc=
 github.com/cryptosuite/liboqs-go v0.9.5-alpha/go.mod h1:LzuvuQAJHbED51lHoYr91rBbKRdv2MewGcVCwjE1JCk=
-github.com/cryptosuite/pqringct v0.13.0 h1:Jt619Ic8s8uEVPXjkDkKrg7Lj5Ft3Ta/eZBIZrL2hbc=
-github.com/cryptosuite/pqringct v0.13.0/go.mod h1:LVtvih9kNVHzAX60qzOqO6TAIjurfNKYWICRDUegjkg=
-github.com/cryptosuite/pqringctx v0.13.0 h1:Ju9AbLUHNHhZVB83El1BC1QEFmNYh5uIwY/qfi+q6f0=
-github.com/cryptosuite/pqringctx v0.13.0/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
+github.com/cryptosuite/pqringct v0.13.1-0.20250912012454-e6f985e4800a h1:u1b8/AGns/0ZTR9QNf0Tfav2SiCXE3AB0CvTKBPJLU0=
+github.com/cryptosuite/pqringct v0.13.1-0.20250912012454-e6f985e4800a/go.mod h1:LVtvih9kNVHzAX60qzOqO6TAIjurfNKYWICRDUegjkg=
+github.com/cryptosuite/pqringctx v0.13.1-0.20251020034854-8e3438f25c0a h1:chQyRulbjyEVoWL+4CzqLa2ezQYNpptTjdJ7UfR7wf4=
+github.com/cryptosuite/pqringctx v0.13.1-0.20251020034854-8e3438f25c0a/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1 h1:vN3Cibtye7f3YuPvrJWG4Kp/jrb/XfxS5oIwl8XZBQY=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
@@ -55,8 +55,8 @@ github.com/lightningnetwork/lnd/clock v1.0.1 h1:QQod8+m3KgqHdvVMV+2DRNNZS1GRFir8
 github.com/lightningnetwork/lnd/clock v1.0.1/go.mod h1:KnQudQ6w0IAMZi1SgvecLZQZ43ra2vpDNj7H/aasemg=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/pqabelian/abelian-aip11-go v0.0.0-20241209075354-09202e9533a5 h1:SQVeqIC3jMx+KgGJaAcN0aUJdSHBjxLHtmcX+2x8XbE=
-github.com/pqabelian/abelian-aip11-go v0.0.0-20241209075354-09202e9533a5/go.mod h1:nZshVYBaaERLQ3H2ViQ0te7xDkaNrw8NtVPBsa4bR/Q=
+github.com/pqabelian/abelian-aip11-go v0.0.0-20251105063917-baa94431c9cb h1:0LUfJXR5f5koI/Iwazhb/zGA7AODIYTdh9mA5cnNjdE=
+github.com/pqabelian/abelian-aip11-go v0.0.0-20251105063917-baa94431c9cb/go.mod h1:nZshVYBaaERLQ3H2ViQ0te7xDkaNrw8NtVPBsa4bR/Q=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsTg=
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=

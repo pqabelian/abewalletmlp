@@ -1614,7 +1614,7 @@ func generateAccountRootSeedsForPQRingCTX(masterSeed []byte, fromCLIWallet bool,
 		}
 	}
 
-	// follow aip-0011
+	// follow aip-0011 & aip-0015
 	accountRootSeeds, err := aip11.MasterSeedToAccountRootSeeds(masterSeed)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
@@ -1627,9 +1627,8 @@ func generateAccountRootSeedsForPQRingCTX(masterSeed []byte, fromCLIWallet bool,
 	coinSerialNumberKeyRootSeed := accountRootSeeds[1]
 	coinValueKeyRootSeed := accountRootSeeds[3]
 	coinDetectorRootKey := accountRootSeeds[2]
-	// TODO(Aconcagua) update to aip-0015
-	//coinValueKeyRootSeedAut := accountRootSeeds[4]
-	coinValueKeyRootSeedAut := accountRootSeeds[3]
+	//TODO(Aconcagua) update to aip-0015
+	coinValueKeyRootSeedAut := accountRootSeeds[4]
 
 	return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, coinValueKeyRootSeedAut, nil
 }
