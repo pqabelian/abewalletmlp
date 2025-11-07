@@ -1620,7 +1620,7 @@ func generateAccountRootSeedsForPQRingCTX(masterSeed []byte, fromCLIWallet bool,
 		return nil, nil, nil, nil, nil, err
 	}
 	// assert
-	if len(accountRootSeeds) != 4 {
+	if len(accountRootSeeds) != 5 {
 		return nil, nil, nil, nil, nil, errors.New("fail to generate account seed")
 	}
 	coinSpendKeyRootSeed := accountRootSeeds[0]
