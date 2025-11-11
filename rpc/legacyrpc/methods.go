@@ -2331,13 +2331,10 @@ func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	}
 	valueScripts := make([][]byte, len(autCoinbaseTx.TxOuts))
 	for i := 0; i < len(autCoinbaseTx.TxOuts); i++ {
-		autTxo := autCoinbaseTx.TxOuts[i]
-		buffer := bytes.NewBuffer(make([]byte, 0, autTxo.SerializeSize()))
-		err = autTxo.Serialize(buffer)
+		valueScripts[i], err = autCoinbaseTx.TxOuts[i].Serialize()
 		if err != nil {
 			return nil, err
 		}
-		valueScripts[i] = buffer.Bytes()
 	}
 
 	scriptWitness := autCoinbaseTx.TxWitness
@@ -2450,13 +2447,10 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	}
 	valueScripts := make([][]byte, len(autTransferTx.TxOuts))
 	for i := 0; i < len(autTransferTx.TxOuts); i++ {
-		autTxo := autTransferTx.TxOuts[i]
-		buffer := bytes.NewBuffer(make([]byte, 0, autTxo.SerializeSize()))
-		err = autTxo.Serialize(buffer)
+		valueScripts[i], err = autTransferTx.TxOuts[i].Serialize()
 		if err != nil {
 			return nil, err
 		}
-		valueScripts[i] = buffer.Bytes()
 	}
 
 	scriptWitness := autTransferTx.TxWitness
@@ -2569,13 +2563,10 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	}
 	valueScripts := make([][]byte, len(autTransferTx.TxOuts))
 	for i := 0; i < len(autTransferTx.TxOuts); i++ {
-		autTxo := autTransferTx.TxOuts[i]
-		buffer := bytes.NewBuffer(make([]byte, 0, autTxo.SerializeSize()))
-		err = autTxo.Serialize(buffer)
+		valueScripts[i], err = autTransferTx.TxOuts[i].Serialize()
 		if err != nil {
 			return nil, err
 		}
-		valueScripts[i] = buffer.Bytes()
 	}
 
 	scriptWitness := autTransferTx.TxWitness

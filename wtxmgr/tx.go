@@ -2106,7 +2106,7 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 							var value uint64
 							if !isAUTRootCoin {
 								ctautTxo := &ctautwire.AutTxo{}
-								err = ctautTxo.Deserialize(bytes.NewReader(token.ValueScript))
+								err = ctautTxo.Deserialize(token.ValueScript)
 								if err != nil {
 									return err
 								}

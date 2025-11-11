@@ -2253,7 +2253,7 @@ func (w *Wallet) GetCTAUTOutpointsForTransfer(identifier []byte, target uint64) 
 			selectedValue += token.Value
 
 			autTxo := &ctautwire.AutTxo{}
-			err = autTxo.Deserialize(bytes.NewReader(token.CoinValueScript))
+			err = autTxo.Deserialize(token.CoinValueScript)
 			if err != nil {
 				return err
 			}
