@@ -2090,11 +2090,11 @@ var CTAUTVersion = wire.TxVersion_Height_464000_Aconcagua
 func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.RegisterCTAUTCmd)
 
-	if len(cmd.CTAUTName) > ctaut.MaxCTAUTNameLength {
-		return nil, fmt.Errorf("the length of name is expected no more than %d, but got %d", ctaut.MaxCTAUTNameLength, len(cmd.CTAUTName))
+	if len(cmd.CTAUTName) > ctaut.MaxAutNameLength {
+		return nil, fmt.Errorf("the length of name is expected no more than %d, but got %d", ctaut.MaxAutNameLength, len(cmd.CTAUTName))
 	}
-	if len(cmd.CTAUTSymbol) > ctaut.MaxCTAUTSymbolLength {
-		return nil, fmt.Errorf("the length of symbol is expected no more than %d, but got %d", ctaut.MaxCTAUTSymbolLength, len(cmd.CTAUTSymbol))
+	if len(cmd.CTAUTSymbol) > ctaut.MaxAutSymbolLength {
+		return nil, fmt.Errorf("the length of symbol is expected no more than %d, but got %d", ctaut.MaxAutSymbolLength, len(cmd.CTAUTSymbol))
 	}
 	if len(cmd.BaseUnitName) > ctaut.MaxBaseUnitLength {
 		return nil, fmt.Errorf("the base-unit name is expected to no more than %d, but got %d", ctaut.MaxBaseUnitLength, len(cmd.BaseUnitName))
