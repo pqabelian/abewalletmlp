@@ -729,7 +729,7 @@ func (w *Wallet) txPqringCTToOutputsMLP(txOutDescs []*abecryptox.AbeTxOutputDesc
 	}
 
 	computeFee := func(txVersion uint32,
-		inputRingVersionForAll []uint32, inRingSizesForAll []uint8, // all inputs
+		inputRingVersionForAll []uint32, inRingSizesForAll []uint8,   // all inputs
 		inputRingVersionsForRing []uint32, inRingSizeForRing []uint8, // ring inputs
 		inForRing uint8, inForSingleDistinct uint8,
 		vPublic int64) (abeutil.Amount, error) {
@@ -1557,14 +1557,14 @@ func (w *Wallet) txPqringCTToOutputsCTAUT(script []byte, scriptWitness []byte,
 	return tx, nil
 }
 
-func (w *Wallet) FindEligibleTxosForCTAUT(scriptType ctaut.CTAUTScriptType, identifier []byte, targetNumOrValue uint64) ([]*wire.OutPointAbe, error) {
+func (w *Wallet) FindEligibleTxosForCTAUT(scriptType ctaut.AutScriptType, identifier []byte, targetNumOrValue uint64) ([]*wire.OutPointAbe, error) {
 	var err error
 	switch scriptType {
-	case ctaut.Registration:
+	case ctaut.AutScriptTypeRegistration:
 		return nil, nil
-	case ctaut.ReRegistration:
+	case ctaut.AutScriptTypeReRegistration:
 		fallthrough
-	case ctaut.Mint:
+	case ctaut.AutScriptTypeMint:
 		var eligibleAUTTokens []*wtxmgr.CTAUTCoin
 		err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
 			txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
@@ -1612,9 +1612,9 @@ func (w *Wallet) FindEligibleTxosForCTAUT(scriptType ctaut.CTAUTScriptType, iden
 		}
 		return outpoints, nil
 
-	case ctaut.Transfer:
+	case ctaut.AutScriptTypeTransfer:
 		fallthrough
-	case ctaut.Burn:
+	case ctaut.AutScriptTypeBurn:
 		var eligibleAUTTokens []*wtxmgr.CTAUTCoin
 		err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
 			txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
