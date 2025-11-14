@@ -5,7 +5,7 @@ go 1.23.2
 toolchain go1.23.4
 
 require (
-	github.com/abesuite/abec v1.0.1-0.20251104131003-1173e7f0c402
+	github.com/abesuite/abec v1.0.1-0.20251114015452-b22e6ac39b0a
 	github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/websocket v1.4.2

@@ -1,7 +1,7 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/abesuite/abec v1.0.1-0.20251104131003-1173e7f0c402 h1:mcjLuXufzwdRYpBdS1vrX1jyMPHI44yspZT/bclzBgw=
-github.com/abesuite/abec v1.0.1-0.20251104131003-1173e7f0c402/go.mod h1:CqMaTaBYZOcGaqCqbQDgKNwCMAeaD4vosk1iyVjAg1M=
+github.com/abesuite/abec v1.0.1-0.20251114015452-b22e6ac39b0a h1:EPNomKK2NTijAfdROFOKW/9/dBACFcOkZlja5uLCNXs=
+github.com/abesuite/abec v1.0.1-0.20251114015452-b22e6ac39b0a/go.mod h1:CqMaTaBYZOcGaqCqbQDgKNwCMAeaD4vosk1iyVjAg1M=
 github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd h1:BNI2MkhhtofxM0sTP8WmdcT4chaAKZOsyhspB58DSrM=
 github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd/go.mod h1:eo8+6JwPaqdnrzzGmGXEH3nOYknOkk8GtuXw7Bo+f08=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=

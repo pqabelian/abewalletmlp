@@ -2096,7 +2096,7 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 					}
 					for t := startIdx; t < len(generatedTokens); t++ {
 						token := generatedTokens[t]
-						if token.HostOutPoint.Index == uint32(j) {
+						if token.HostOutPoint.Index == uint8(j) {
 							tmp.PackedFlag |= txoFlagCTAUTCoin
 
 							isAUTRootCoin := ctAUTScript.Type() == ctaut.Registration ||
