@@ -2219,11 +2219,11 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(specifiedIdentifier) != ctaut.CTAUTIdentifierLength {
+	if len(specifiedIdentifier) != ctaut.AutIdentifierLength {
 		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d",
-			ctaut.CTAUTIdentifierLength, len(specifiedIdentifier))
+			ctaut.AutIdentifierLength, len(specifiedIdentifier))
 	}
-	var identifier [ctaut.CTAUTIdentifierLength]byte
+	var identifier [ctaut.AutIdentifierLength]byte
 	copy(identifier[:], specifiedIdentifier[:])
 
 	hostedOutpoints, err := w.GetCTAUTOutpointsForIssuer(identifier[:], cmd.AUTIssuerUpdateThreshold)
@@ -2252,11 +2252,11 @@ func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(specifiedIdentifier) != ctaut.CTAUTIdentifierLength {
+	if len(specifiedIdentifier) != ctaut.AutIdentifierLength {
 		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d",
-			ctaut.CTAUTIdentifierLength, len(specifiedIdentifier))
+			ctaut.AutIdentifierLength, len(specifiedIdentifier))
 	}
-	var identifier [ctaut.CTAUTIdentifierLength]byte
+	var identifier [ctaut.AutIdentifierLength]byte
 	copy(identifier[:], specifiedIdentifier[:])
 
 	hostedOutpoints, err := w.GetCTAUTOutpointsForIssuer(identifier[:], cmd.CTAUTMintThreshold)
@@ -2361,11 +2361,11 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(specifiedIdentifier) != ctaut.CTAUTIdentifierLength {
+	if len(specifiedIdentifier) != ctaut.AutIdentifierLength {
 		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d",
-			ctaut.CTAUTIdentifierLength, len(specifiedIdentifier))
+			ctaut.AutIdentifierLength, len(specifiedIdentifier))
 	}
-	var identifier [ctaut.CTAUTIdentifierLength]byte
+	var identifier [ctaut.AutIdentifierLength]byte
 	copy(identifier[:], specifiedIdentifier[:])
 
 	// sort recipients
@@ -2477,11 +2477,11 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(specifiedIdentifier) != ctaut.CTAUTIdentifierLength {
+	if len(specifiedIdentifier) != ctaut.AutIdentifierLength {
 		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d",
-			ctaut.CTAUTIdentifierLength, len(specifiedIdentifier))
+			ctaut.AutIdentifierLength, len(specifiedIdentifier))
 	}
-	var identifier [ctaut.CTAUTIdentifierLength]byte
+	var identifier [ctaut.AutIdentifierLength]byte
 	copy(identifier[:], specifiedIdentifier[:])
 
 	// sort recipients
