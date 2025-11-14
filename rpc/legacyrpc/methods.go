@@ -2085,7 +2085,7 @@ func burnAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 	return sendAddressAbeAUT(w, autTransaction, nil, 0, txrules.DefaultRelayFeePerKb, 0, 0, utxosSpecified)
 }
 
-var CTAUTVersion = wire.TxVersion_Height_450000_Aconcagua
+var CTAUTVersion = wire.TxVersion_Height_464000_Aconcagua
 
 func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.RegisterCTAUTCmd)
