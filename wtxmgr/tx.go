@@ -1732,7 +1732,7 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 		txi := block.TxRecords[i].MsgTx
 		txhash := txi.TxHash()
 
-		ctAUTScript, err := ctaut.ExtractCTAUTScript(&txi)
+		ctAUTScript, err := ctaut.ExtractAutScript(&txi)
 		if err != nil {
 			if !errors.Is(err, ctaut.ErrNonAutTx) {
 				log.Warnf("extract transaction %s as aut transaction err:%s", txhash, err)
