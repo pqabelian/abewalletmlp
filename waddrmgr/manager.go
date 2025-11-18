@@ -491,9 +491,12 @@ func (m *Manager) FetchProtectedRootSeeds(ns walletdb.ReadBucket) ([]byte, []byt
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-	valueRootSeedAut, err := m.Decrypt(CKTPublic, valueRootSeedAutEnc)
-	if err != nil {
-		return nil, nil, nil, nil, nil, err
+	var valueRootSeedAut []byte
+	if valueRootSeedAutEnc != nil {
+		valueRootSeedAut, err = m.Decrypt(CKTPublic, valueRootSeedAutEnc)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
 	}
 
 	return spKeyRootSeed, snKeyRootSeed, valueRootSeed, detectorRootKey, valueRootSeedAut, nil
