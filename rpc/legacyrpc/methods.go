@@ -2154,7 +2154,8 @@ func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	autScript := ctaut.NewRegistrationScript(CTAUTVersion,
 		[]byte(cmd.CTAUTName), []byte(cmd.CTAUTSymbol),
 		[]byte(cmd.BaseUnitName), []byte(cmd.SubUnitName), cmd.UnitScale,
-		[]byte(cmd.CTAUTMemo), cmd.PlannedTotalAmount, issuerTokens,
+		[]byte(cmd.CTAUTMemo), cmd.PlannedTotalAmount,
+		//issuerTokens,
 		cmd.MintThreshold, cmd.ReRegisterThreshold, cmd.ExpireHeight,
 		uint8(len(outputs)), []byte{})
 
@@ -2233,7 +2234,8 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 
 	autScript := ctaut.NewReRegistrationScript(CTAUTVersion,
 		identifier, []byte(cmd.CTAUTMemo),
-		cmd.PlannedTotalAmount, issuerTokens,
+		cmd.PlannedTotalAmount,
+		//issuerTokens,
 		cmd.MintThreshold, cmd.ReRegisterThreshold, cmd.ExpireHeight,
 		uint8(len(hostedOutpoints)), uint8(len(outputs)), []byte(cmd.Memo))
 
