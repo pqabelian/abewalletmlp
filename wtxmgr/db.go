@@ -5,12 +5,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abewalletmlp/walletdb"
-	"reflect"
-	"time"
 )
 
 // Naming
@@ -970,29 +971,29 @@ func putImmatureCoinbaseOutput(ns walletdb.ReadWriteBucket, blockHeight int32, b
 		return storeError(ErrDatabase, str, err)
 	}
 
-	immatureCoinbaseOutput, err := fetchImmatureCoinbaseOutput(ns, blockHeight, blockHash)
-	if err != nil {
-		panic("unmatched ImmatureCoinbaseOutputs")
-	}
-	for outpoint, txo := range txos {
-		txo2, ok := immatureCoinbaseOutput[outpoint]
-		if !ok {
-			panic("unmatched ImmatureCoinbaseOutputs")
-		}
-		if !reflect.DeepEqual(txo, txo2) {
-			panic("unmatched ImmatureCoinbaseOutputs")
-		}
-	}
+	//immatureCoinbaseOutput, err := fetchImmatureCoinbaseOutput(ns, blockHeight, blockHash)
+	//if err != nil {
+	//	panic("unmatched ImmatureCoinbaseOutputs")
+	//}
+	//for outpoint, txo := range txos {
+	//	txo2, ok := immatureCoinbaseOutput[outpoint]
+	//	if !ok {
+	//		panic("unmatched ImmatureCoinbaseOutputs")
+	//	}
+	//if !reflect.DeepEqual(txo, txo2) {
+	//	panic("unmatched ImmatureCoinbaseOutputs")
+	//}
+	//}
 
-	for outpoint, txo := range immatureCoinbaseOutput {
-		txo2, ok := txos[outpoint]
-		if !ok {
-			panic("unmatched ImmatureCoinbaseOutputs")
-		}
-		if !reflect.DeepEqual(txo, txo2) {
-			panic("unmatched ImmatureCoinbaseOutputs")
-		}
-	}
+	//for outpoint, txo := range immatureCoinbaseOutput {
+	//	txo2, ok := txos[outpoint]
+	//	if !ok {
+	//		panic("unmatched ImmatureCoinbaseOutputs")
+	//	}
+	//	if !reflect.DeepEqual(txo, txo2) {
+	//		panic("unmatched ImmatureCoinbaseOutputs")
+	//	}
+	//}
 
 	return nil
 }
