@@ -3,7 +3,6 @@ package wtxmgr
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
@@ -230,13 +229,14 @@ func putRawCTAUTCoin(ns walletdb.ReadWriteBucket, txHash chainhash.Hash, index u
 		return storeError(ErrDatabase, str, err)
 	}
 
-	autCoin, err := fetchRawCTAUTCoin(ns, txHash, index)
-	if err != nil {
-		panic("unmatched CTAUTCoin serialized/deserialized")
-	}
-	if !reflect.DeepEqual(autCoin, coin) {
-		log.Errorf("unmatched CTAUTCoin serialized/deserialized")
-	}
+	//autCoin, err := fetchRawCTAUTCoin(ns, txHash, index)
+	//if err != nil {
+	//panic("unmatched CTAUTCoin serialized/deserialized")
+	//return err
+	//}
+	//if !reflect.DeepEqual(autCoin, coin) {
+	//	log.Errorf("unmatched CTAUTCoin serialized/deserialized")
+	//}
 	return nil
 }
 

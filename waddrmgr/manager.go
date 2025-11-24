@@ -571,6 +571,10 @@ func (m *Manager) GenerateAddressKeys(ns walletdb.ReadWriteBucket, privacyLevel 
 		return nil, nil, nil, nil, nil, nil, err
 	}
 
+	if privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT && len(valueRootSeedAut) == 0 {
+		return nil, nil, nil, nil, nil, nil, fmt.Errorf("please re-import account for generating address with privacy level %d", privacyLevel)
+	}
+
 	serializedCryptoAddress, serializedASksp, serializedASksn, serializedVSk,
 		detectorKey, publicRand, err := generateAddressSKForPQRingCTX(m.cryptoScheme, privacyLevel,
 		spKeyRootSeed, snKeyRootSeed,

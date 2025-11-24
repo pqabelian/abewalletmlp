@@ -729,7 +729,7 @@ func (w *Wallet) txPqringCTToOutputsMLP(txOutDescs []*abecryptox.AbeTxOutputDesc
 	}
 
 	computeFee := func(txVersion uint32,
-		inputRingVersionForAll []uint32, inRingSizesForAll []uint8,   // all inputs
+		inputRingVersionForAll []uint32, inRingSizesForAll []uint8, // all inputs
 		inputRingVersionsForRing []uint32, inRingSizeForRing []uint8, // ring inputs
 		inForRing uint8, inForSingleDistinct uint8,
 		vPublic int64) (abeutil.Amount, error) {
@@ -1557,7 +1557,7 @@ func (w *Wallet) txPqringCTToOutputsCTAUT(script []byte, scriptWitness []byte,
 	return tx, nil
 }
 
-func (w *Wallet) FindEligibleTxosForCTAUT(scriptType ctaut.AutScriptType, identifier []byte, targetNumOrValue uint64) ([]*wire.OutPointAbe, error) {
+func (w *Wallet) FindEligibleTxosForCTAUT(scriptType ctaut.AutScriptType, identifier ctaut.AutId, targetNumOrValue uint64) ([]*wire.OutPointAbe, error) {
 	var err error
 	switch scriptType {
 	case ctaut.AutScriptTypeRegistration:
@@ -2595,7 +2595,7 @@ func (w *Wallet) findEligibleTxosAbeAUT(txmgrNs walletdb.ReadBucket, minconf int
 	return eligible, nil
 }
 
-func (w *Wallet) findEligibleTxosAbeCTAUT(txmgrNs walletdb.ReadBucket, minconf int32, bs *waddrmgr.BlockStamp, identifier []byte) ([]*wtxmgr.CTAUTCoin, error) {
+func (w *Wallet) findEligibleTxosAbeCTAUT(txmgrNs walletdb.ReadBucket, minconf int32, bs *waddrmgr.BlockStamp, identifier ctaut.AutId) ([]*wtxmgr.CTAUTCoin, error) {
 	unspent, _, err := w.TxStore.UnspentOutputsCTAUT(txmgrNs, identifier, false) // In ABE, this result will be spendable for the logic of store
 	if err != nil {
 		return nil, err

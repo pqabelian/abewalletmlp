@@ -3,7 +3,6 @@ package wtxmgr
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"reflect"
@@ -1428,11 +1427,11 @@ func ConfirmSpentTXO(ns walletdb.ReadWriteBucket, txHash chainhash.Hash, index u
 				return err
 			}
 			if token.IsAUTRootCoin {
-				ctautSpendableRootCoinNums[hex.EncodeToString(token.AUTIdentifier)] -= 1
-				ctautRootCoinNums[hex.EncodeToString(token.AUTIdentifier)] -= 1
+				ctautSpendableRootCoinNums[token.AUTIdentifier.String()] -= 1
+				ctautRootCoinNums[token.AUTIdentifier.String()] -= 1
 			} else {
-				ctautSpendableBals[hex.EncodeToString(token.AUTIdentifier)] -= token.Value
-				ctautBals[hex.EncodeToString(token.AUTIdentifier)] -= token.Value
+				ctautSpendableBals[token.AUTIdentifier.String()] -= token.Value
+				ctautBals[token.AUTIdentifier.String()] -= token.Value
 			}
 		}
 
@@ -1458,9 +1457,9 @@ func ConfirmSpentTXO(ns walletdb.ReadWriteBucket, txHash chainhash.Hash, index u
 				return err
 			}
 			if token.IsAUTRootCoin {
-				ctautRootCoinNums[string(token.AUTIdentifier)] -= 1
+				ctautRootCoinNums[token.AUTIdentifier.String()] -= 1
 			} else {
-				ctautBals[string(token.AUTIdentifier)] -= token.Value
+				ctautBals[token.AUTIdentifier.String()] -= token.Value
 			}
 		}
 	} else {

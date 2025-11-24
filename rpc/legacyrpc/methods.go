@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -19,6 +20,7 @@ import (
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/ctaut"
+	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abewalletmlp/wallet/txrules"
 
 	"github.com/abesuite/abec/btcec"
@@ -2085,7 +2087,7 @@ func burnAUTTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error)
 	return sendAddressAbeAUT(w, autTransaction, nil, 0, txrules.DefaultRelayFeePerKb, 0, 0, utxosSpecified)
 }
 
-var CTAUTVersion = wire.TxVersion_Height_464000_Aconcagua
+var CTAUTScriptVersion = ctautwire.AutScriptVersion_1
 
 func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.RegisterCTAUTCmd)
@@ -2151,7 +2153,7 @@ func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		}
 	}
 
-	autScript := ctaut.NewRegistrationScript(CTAUTVersion,
+	autScript := ctaut.NewRegistrationScript(CTAUTScriptVersion,
 		[]byte(cmd.CTAUTName), []byte(cmd.CTAUTSymbol),
 		[]byte(cmd.BaseUnitName), []byte(cmd.SubUnitName), cmd.UnitScale,
 		[]byte(cmd.CTAUTMemo), cmd.PlannedTotalAmount,
@@ -2216,23 +2218,18 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		}
 	}
 
-	specifiedIdentifier, err := hex.DecodeString(cmd.AUTIdentifier)
+	identifierFromCmd, err := chainhash.NewHashFromStr(cmd.AUTIdentifier)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid identifier %s", cmd.AUTIdentifier)
 	}
-	if len(specifiedIdentifier) != ctaut.AutIdentifierLength {
-		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d",
-			ctaut.AutIdentifierLength, len(specifiedIdentifier))
-	}
-	var identifier [ctaut.AutIdentifierLength]byte
-	copy(identifier[:], specifiedIdentifier[:])
+	identifier := ctaut.AutId(*identifierFromCmd)
 
-	hostedOutpoints, err := w.GetCTAUTOutpointsForIssuer(identifier[:], cmd.AUTIssuerUpdateThreshold)
+	hostedOutpoints, err := w.GetCTAUTOutpointsForIssuer(identifier, cmd.AUTIssuerUpdateThreshold)
 	if err != nil {
 		return nil, err
 	}
 
-	autScript := ctaut.NewReRegistrationScript(CTAUTVersion,
+	autScript := ctaut.NewReRegistrationScript(CTAUTScriptVersion,
 		identifier, []byte(cmd.CTAUTMemo),
 		cmd.PlannedTotalAmount,
 		//issuerTokens,
@@ -2250,18 +2247,13 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.MintCTAUTCmd)
 
-	specifiedIdentifier, err := hex.DecodeString(cmd.AUTIdentifier)
+	identifierFromCmd, err := chainhash.NewHashFromStr(cmd.AUTIdentifier)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid identifier %s", cmd.AUTIdentifier)
 	}
-	if len(specifiedIdentifier) != ctaut.AutIdentifierLength {
-		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d",
-			ctaut.AutIdentifierLength, len(specifiedIdentifier))
-	}
-	var identifier [ctaut.AutIdentifierLength]byte
-	copy(identifier[:], specifiedIdentifier[:])
+	identifier := ctaut.AutId(*identifierFromCmd)
 
-	hostedOutpoints, err := w.GetCTAUTOutpointsForIssuer(identifier[:], cmd.CTAUTMintThreshold)
+	hostedOutpoints, err := w.GetCTAUTOutpointsForIssuer(identifier, cmd.CTAUTMintThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -2324,7 +2316,7 @@ func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	if vin != cmd.Vin {
 		return nil, fmt.Errorf("the input value is not equal to the sum of the output values")
 	}
-	autCoinbaseTx, err := abecryptox.AutCoinbaseTxGen(wire.TxVersion, vin, autTxOutputDescs)
+	autCoinbaseTx, err := abecryptox.AutCoinbaseTxGen(CTAUTScriptVersion, vin, autTxOutputDescs)
 	if err != nil {
 		return nil, err
 	}
@@ -2342,7 +2334,7 @@ func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	scriptWitness := autCoinbaseTx.TxWitness
 	witnessHash := chainhash.HashH(autCoinbaseTx.TxWitness)
 
-	autScript := ctaut.NewMintScript(CTAUTVersion,
+	autScript := ctaut.NewMintScript(CTAUTScriptVersion,
 		identifier,
 		vin, uint8(len(hostedOutpoints)),
 		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
@@ -2359,16 +2351,11 @@ func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.TransferCTAUTCmd)
 
-	specifiedIdentifier, err := hex.DecodeString(cmd.AUTIdentifier)
+	identifierFromCmd, err := chainhash.NewHashFromStr(cmd.AUTIdentifier)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid identifier %s", cmd.AUTIdentifier)
 	}
-	if len(specifiedIdentifier) != ctaut.AutIdentifierLength {
-		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d",
-			ctaut.AutIdentifierLength, len(specifiedIdentifier))
-	}
-	var identifier [ctaut.AutIdentifierLength]byte
-	copy(identifier[:], specifiedIdentifier[:])
+	identifier := ctaut.AutId(*identifierFromCmd)
 
 	// sort recipients
 	sort.SliceStable(cmd.Recipients, func(i, j int) bool {
@@ -2426,7 +2413,7 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		}
 	}
 
-	autTxInputDescs, hostedOutpoints, inCTAUTTokenNum, inPlainAUTTokenNum, changeValue, err := w.GetCTAUTOutpointsForTransfer(identifier[:], target)
+	autTxInputDescs, hostedOutpoints, inCTAUTTokenNum, inPlainAUTTokenNum, changeValue, err := w.GetCTAUTOutpointsForTransfer(identifier, target)
 	if err != nil {
 		return nil, err
 	}
@@ -2440,7 +2427,7 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		})
 	}
 
-	autTransferTx, err := abecryptox.AutTransferTxGen(wire.TxVersion, autTxInputDescs, autTxOutputDescs)
+	autTransferTx, err := abecryptox.AutTransferTxGen(CTAUTScriptVersion, autTxInputDescs, autTxOutputDescs)
 	if err != nil {
 		return nil, err
 	}
@@ -2458,7 +2445,7 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	scriptWitness := autTransferTx.TxWitness
 	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
 
-	autScript := ctaut.NewTransferScript(CTAUTVersion,
+	autScript := ctaut.NewTransferScript(CTAUTScriptVersion,
 		identifier,
 		inCTAUTTokenNum, inPlainAUTTokenNum,
 		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
@@ -2475,16 +2462,11 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.BurnCTAUTCmd)
 
-	specifiedIdentifier, err := hex.DecodeString(cmd.AUTIdentifier)
+	identifierFromCmd, err := chainhash.NewHashFromStr(cmd.AUTIdentifier)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid identifier %s", cmd.AUTIdentifier)
 	}
-	if len(specifiedIdentifier) != ctaut.AutIdentifierLength {
-		return nil, fmt.Errorf("the length of identifier is expected %d, but got %d",
-			ctaut.AutIdentifierLength, len(specifiedIdentifier))
-	}
-	var identifier [ctaut.AutIdentifierLength]byte
-	copy(identifier[:], specifiedIdentifier[:])
+	identifier := ctaut.AutId(*identifierFromCmd)
 
 	// sort recipients
 	sort.SliceStable(cmd.Recipients, func(i, j int) bool {
@@ -2542,21 +2524,31 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		}
 	}
 
-	autTxInputDescs, hostedOutpoints, inCTAUTTokenNum, inPlainAUTTokenNum, changeValue, err := w.GetCTAUTOutpointsForTransfer(identifier[:], target)
+	autTxInputDescs, hostedOutpoints, inCTAUTTokenNum, inPlainAUTTokenNum, changeValue, err := w.GetCTAUTOutpointsForTransfer(identifier, target)
 	if err != nil {
 		return nil, err
 	}
 	if changeValue > 0 {
 		outPlainAutTokenNum++ // support CT-AUT Token as change
 
-		autTxOutputDescs = append(autTxOutputDescs, abecryptox.NewAutTxOutDesc(abecryptox.AutTxoTypePublic, changeValue, nil))
-		outputs = append(outputs, abejson.Pair{
+		changeTxOutDesc := abecryptox.NewAutTxOutDesc(abecryptox.AutTxoTypePublic, changeValue, nil)
+		changePair := abejson.Pair{
 			Address: cmd.ChangeAddress,
 			Amount:  1,
-		})
+		}
+
+		// ensure not the last recipient in the recipient
+		index := len(cmd.Recipients) - 1
+		for ; index >= 0; index-- {
+			if !cmd.Recipients[index].Hidden {
+				break
+			}
+		}
+		autTxOutputDescs = slices.Insert(autTxOutputDescs, index, changeTxOutDesc)
+		outputs = slices.Insert(outputs, index, changePair)
 	}
 
-	autTransferTx, err := abecryptox.AutTransferTxGen(wire.TxVersion, autTxInputDescs, autTxOutputDescs)
+	autTransferTx, err := abecryptox.AutTransferTxGen(CTAUTScriptVersion, autTxInputDescs, autTxOutputDescs)
 	if err != nil {
 		return nil, err
 	}
@@ -2574,7 +2566,7 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	scriptWitness := autTransferTx.TxWitness
 	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
 
-	autScript := ctaut.NewBurnScript(CTAUTVersion, identifier,
+	autScript := ctaut.NewBurnScript(CTAUTScriptVersion, identifier,
 		inCTAUTTokenNum, inPlainAUTTokenNum,
 		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
 		witnessHash, []byte(cmd.Memo))
