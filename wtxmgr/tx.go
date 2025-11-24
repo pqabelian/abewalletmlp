@@ -2092,7 +2092,7 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 					txi.Version, txi.TxHash(), j, block.Height, block.Hash, amt.ToABE(), tmp.IsPseudonymous())
 
 				if ctAUTScript != nil {
-					identifier := ctAUTScript.Identifier()
+					identifier := ctAUTScript.AutIdentifier()
 					generatedTokens, err := ctAUTScript.GeneratedTokens()
 					if err != nil {
 						return err
@@ -2155,7 +2155,7 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 
 		// if the type of aut transaction is re-registration, need to consume exist root coin
 		if ctAUTScript != nil && ctAUTScript.Type() == ctaut.AutScriptTypeReRegistration {
-			identifier := ctAUTScript.Identifier()
+			identifier := ctAUTScript.AutIdentifier()
 			remainRootCoins, _, err := s.UnspentOutputsCTAUT(txMgrNs, identifier, true)
 			if err != nil {
 				return err
