@@ -2026,7 +2026,20 @@ func (w *Wallet) createTransactionMLPByKeys(
 	sort.SliceStable(txOutDescs, func(i, j int) bool {
 		outputIAddressPrivacyLevel, _, _, _ := abecryptoxkey.CryptoAddressParse(txOutDescs[i].CryptoAddress())
 		outputJAddressPrivacyLevel, _, _, _ := abecryptoxkey.CryptoAddressParse(txOutDescs[j].CryptoAddress())
-		if outputIAddressPrivacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM && outputJAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM {
+
+		isPseudonymousI := outputIAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM || outputIAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT
+		isPseudonymousJ := outputJAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM || outputJAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT
+		if isPseudonymousI && !isPseudonymousJ {
+			return false
+		}
+		if !isPseudonymousI && isPseudonymousJ {
+			return true
+		}
+		if !isPseudonymousI && !isPseudonymousJ {
+			return false
+		}
+		if outputIAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT &&
+			outputJAddressPrivacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
 			return true
 		}
 		return false

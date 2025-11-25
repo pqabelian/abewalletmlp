@@ -2215,12 +2215,11 @@ func (w *Wallet) GetCTAUTOutpointsForTransfer(identifier ctaut.AutId, target uin
 				return tokens[i].Value < tokens[j].Value
 			}
 
-			if tokens[i].AutTxoType == abecryptox.AutTxoTypeHidden {
+			if tokens[i].AutTxoType == abecryptox.AutTxoTypeHidden &&
+				tokens[j].AutTxoType != abecryptox.AutTxoTypeHidden {
 				return true
 			}
-			if tokens[j].AutTxoType == abecryptox.AutTxoTypeHidden {
-				return false
-			}
+
 			return false
 		})
 
