@@ -2110,7 +2110,7 @@ func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 
 	// unique issuer token check
 	existIssuerToken := map[string]struct{}{}
-	issuerTokens := make([][]byte, 0, len(cmd.IssuerTokens))
+	issuerTokens := make([]*ctaut.AutIssuer, 0, len(cmd.IssuerTokens))
 	cryptoAddresses := make([][]byte, 0, len(issuerTokens))
 	for i := 0; i < len(cmd.IssuerTokens); i++ {
 		if _, ok := existIssuerToken[cmd.IssuerTokens[i]]; !ok {
@@ -2131,7 +2131,7 @@ func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		issuerTokens = append(issuerTokens, issuerToken)
+		issuerTokens = append(issuerTokens, ctaut.NewAutIssuer(issuerToken))
 	}
 	if len(existIssuerToken) != len(cmd.IssuerTokens) {
 		return nil, errors.New("issuer token can not contain duplicate")
@@ -2157,8 +2157,8 @@ func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		[]byte(cmd.CTAUTName), []byte(cmd.CTAUTSymbol),
 		[]byte(cmd.BaseUnitName), []byte(cmd.SubUnitName), cmd.UnitScale,
 		[]byte(cmd.CTAUTMemo), cmd.PlannedTotalAmount,
-		//issuerTokens,
-		cmd.MintThreshold, cmd.ReRegisterThreshold, cmd.ExpireHeight,
+		issuerTokens, cmd.ExpireHeight,
+		cmd.ReRegisterThreshold, cmd.MintThreshold,
 		uint8(len(outputs)), []byte{})
 
 	serializedAutScript, err := autScript.Serialize()
@@ -2175,7 +2175,7 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 
 	// unique issuer token check
 	existIssuerToken := map[string]struct{}{}
-	issuerTokens := make([][]byte, 0, len(cmd.IssuerTokens))
+	issuerTokens := make([]*ctaut.AutIssuer, 0, len(cmd.IssuerTokens))
 	cryptoAddresses := make([][]byte, 0, len(issuerTokens))
 	for i := 0; i < len(cmd.IssuerTokens); i++ {
 		if _, ok := existIssuerToken[cmd.IssuerTokens[i]]; !ok {
@@ -2196,7 +2196,7 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		issuerTokens = append(issuerTokens, issuerToken)
+		issuerTokens = append(issuerTokens, ctaut.NewAutIssuer(issuerToken))
 	}
 	if len(existIssuerToken) != len(cmd.IssuerTokens) {
 		return nil, errors.New("issuer token can not contain duplicate")
@@ -2232,8 +2232,8 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	autScript := ctaut.NewReRegistrationScript(CTAUTScriptVersion,
 		identifier, []byte(cmd.CTAUTMemo),
 		cmd.PlannedTotalAmount,
-		//issuerTokens,
-		cmd.MintThreshold, cmd.ReRegisterThreshold, cmd.ExpireHeight,
+		issuerTokens, cmd.ExpireHeight,
+		cmd.ReRegisterThreshold, cmd.MintThreshold,
 		uint8(len(hostedOutpoints)), uint8(len(outputs)), []byte(cmd.Memo))
 
 	serializedAutScript, err := autScript.Serialize()
@@ -2263,10 +2263,6 @@ func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		if cmd.Recipients[i].Hidden && !cmd.Recipients[j].Hidden {
 			return true
 		}
-		if !cmd.Recipients[i].Hidden && cmd.Recipients[j].Hidden {
-			return false
-		}
-
 		return false
 	})
 
@@ -2332,7 +2328,8 @@ func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	}
 
 	scriptWitness := autCoinbaseTx.TxWitness
-	witnessHash := chainhash.HashH(autCoinbaseTx.TxWitness)
+
+	witnessHash := ctautwire.AutWitnessHash(autCoinbaseTx.TxWitness)
 
 	autScript := ctaut.NewMintScript(CTAUTScriptVersion,
 		identifier,
@@ -2361,9 +2358,6 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	sort.SliceStable(cmd.Recipients, func(i, j int) bool {
 		if cmd.Recipients[i].Hidden && !cmd.Recipients[j].Hidden {
 			return true
-		}
-		if !cmd.Recipients[i].Hidden && cmd.Recipients[j].Hidden {
-			return false
 		}
 
 		return false
@@ -2443,7 +2437,7 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	}
 
 	scriptWitness := autTransferTx.TxWitness
-	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
+	witnessHash := ctautwire.AutWitnessHash(autTransferTx.TxWitness)
 
 	autScript := ctaut.NewTransferScript(CTAUTScriptVersion,
 		identifier,
@@ -2472,9 +2466,6 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	sort.SliceStable(cmd.Recipients, func(i, j int) bool {
 		if cmd.Recipients[i].Hidden && !cmd.Recipients[j].Hidden {
 			return true
-		}
-		if !cmd.Recipients[i].Hidden && cmd.Recipients[j].Hidden {
-			return false
 		}
 
 		return false
@@ -2564,7 +2555,7 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	}
 
 	scriptWitness := autTransferTx.TxWitness
-	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
+	witnessHash := ctautwire.AutWitnessHash(autTransferTx.TxWitness)
 
 	autScript := ctaut.NewBurnScript(CTAUTScriptVersion, identifier,
 		inCTAUTTokenNum, inPlainAUTTokenNum,
