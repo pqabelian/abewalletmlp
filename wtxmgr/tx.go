@@ -2367,11 +2367,21 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 			return fmt.Errorf("newUtxoRingEntries is called with node that does not have 2 previous successive blocks in database")
 		}
 
-		block0 := abeutil.NewBlockAbe(msgBlock0) // height % 3 = 0
+		block0, err := abeutil.NewBlockAbe(msgBlock0) // height % 3 = 0
+		if err != nil {
+			return err
+		}
 		block0.SetHeight(block.Height - 2)
-		block1 := abeutil.NewBlockAbe(msgBlock1) // height %3 = 1
+		block1, err := abeutil.NewBlockAbe(msgBlock1) // height %3 = 1
+		if err != nil {
+			return err
+		}
 		block1.SetHeight(block.Height - 1)
-		block2 := abeutil.NewBlockAbe(&msgBlock2) // height % 3 = 2
+		block2, err := abeutil.NewBlockAbe(&msgBlock2) // height % 3 = 2
+		if err != nil {
+			return err
+		}
+
 		block2.SetHeight(block.Height)
 		blocks := []*abeutil.BlockAbe{block0, block1, block2}
 		//ringBlockHeight := blocks[2].Height()

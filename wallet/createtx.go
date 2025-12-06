@@ -1608,7 +1608,7 @@ func (w *Wallet) FindEligibleTxosForCTAUT(scriptType ctaut.AutScriptType, identi
 			outpoints = append(outpoints, outpoint)
 		}
 		if len(outpoints) < int(targetNumOrValue) {
-			return nil, errors.New("not enough root coin to re-register")
+			return nil, errors.New("not enough root coin to re-register/mint")
 		}
 		return outpoints, nil
 

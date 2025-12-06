@@ -2184,7 +2184,7 @@ func (w *Wallet) GetCTAUTOutpointsForIssuer(identifier ctaut.AutId, threshold ui
 			})
 		}
 		if uint8(len(outpoints)) < threshold {
-			return fmt.Errorf("not enough root coin to re-register")
+			return fmt.Errorf("not enough root coin to re-register/mint")
 		}
 		return nil
 	})

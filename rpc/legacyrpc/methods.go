@@ -20,6 +20,7 @@ import (
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/ctaut"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abewalletmlp/wallet/txrules"
 
@@ -1594,16 +1595,24 @@ func sendAddressAbeAUT(w *wallet.Wallet, autTransaction aut.Transaction, amounts
 }
 
 func sendAddressAbeCTAUT(w *wallet.Wallet,
-	script []byte, scriptWitness []byte,
+	script ctautapi.AutScript, scriptWitness []byte,
 	amounts []abejson.Pair,
 	minconf int32, feePerKbSpecified abeutil.Amount,
 	utxoSpecified []string, hostOutpoints []*wire.OutPointAbe) (string, error) {
+
+	packagedAutScript, err := ctautapi.PackageAutScript(script)
+	if err != nil {
+		return "", &abejson.RPCError{
+			Code:    abejson.ErrRPCInternal.Code,
+			Message: err.Error(),
+		}
+	}
 
 	outputDescs, err := makeOutputDescsForPairs(w, amounts, w.ChainParams())
 	if err != nil {
 		return "", err
 	}
-	tx, err := w.SendOutputsCTAUT(script, scriptWitness,
+	tx, err := w.SendOutputsCTAUT(packagedAutScript, scriptWitness,
 		outputDescs, minconf, feePerKbSpecified, utxoSpecified, hostOutpoints)
 	if err != nil {
 		if err == txrules.ErrAmountNegative {
@@ -2110,7 +2119,7 @@ func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 
 	// unique issuer token check
 	existIssuerToken := map[string]struct{}{}
-	issuerTokens := make([]*ctaut.AutIssuer, 0, len(cmd.IssuerTokens))
+	issuerTokens := make([]*ctautapi.AutIssuer, 0, len(cmd.IssuerTokens))
 	cryptoAddresses := make([][]byte, 0, len(issuerTokens))
 	for i := 0; i < len(cmd.IssuerTokens); i++ {
 		if _, ok := existIssuerToken[cmd.IssuerTokens[i]]; !ok {
@@ -2131,7 +2140,7 @@ func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		issuerTokens = append(issuerTokens, ctaut.NewAutIssuer(issuerToken))
+		issuerTokens = append(issuerTokens, ctautapi.NewAutIssuer(issuerToken))
 	}
 	if len(existIssuerToken) != len(cmd.IssuerTokens) {
 		return nil, errors.New("issuer token can not contain duplicate")
@@ -2153,7 +2162,7 @@ func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		}
 	}
 
-	autScript := ctaut.NewRegistrationScript(CTAUTScriptVersion,
+	autScript := ctautapi.NewRegistrationScript(CTAUTScriptVersion,
 		[]byte(cmd.CTAUTName), []byte(cmd.CTAUTSymbol),
 		[]byte(cmd.BaseUnitName), []byte(cmd.SubUnitName), cmd.UnitScale,
 		[]byte(cmd.CTAUTMemo), cmd.PlannedTotalAmount,
@@ -2161,12 +2170,7 @@ func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		cmd.ReRegisterThreshold, cmd.MintThreshold,
 		uint8(len(outputs)), []byte{})
 
-	serializedAutScript, err := autScript.Serialize()
-	if err != nil {
-		return nil, err
-	}
-
-	return sendAddressAbeCTAUT(w, serializedAutScript, nil,
+	return sendAddressAbeCTAUT(w, autScript, nil,
 		outputs, 0, txrules.DefaultRelayFeePerKb, nil, nil)
 }
 
@@ -2175,7 +2179,7 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 
 	// unique issuer token check
 	existIssuerToken := map[string]struct{}{}
-	issuerTokens := make([]*ctaut.AutIssuer, 0, len(cmd.IssuerTokens))
+	issuerTokens := make([]*ctautapi.AutIssuer, 0, len(cmd.IssuerTokens))
 	cryptoAddresses := make([][]byte, 0, len(issuerTokens))
 	for i := 0; i < len(cmd.IssuerTokens); i++ {
 		if _, ok := existIssuerToken[cmd.IssuerTokens[i]]; !ok {
@@ -2196,7 +2200,7 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		issuerTokens = append(issuerTokens, ctaut.NewAutIssuer(issuerToken))
+		issuerTokens = append(issuerTokens, ctautapi.NewAutIssuer(issuerToken))
 	}
 	if len(existIssuerToken) != len(cmd.IssuerTokens) {
 		return nil, errors.New("issuer token can not contain duplicate")
@@ -2229,19 +2233,14 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		return nil, err
 	}
 
-	autScript := ctaut.NewReRegistrationScript(CTAUTScriptVersion,
+	autScript := ctautapi.NewReRegistrationScript(CTAUTScriptVersion,
 		identifier, []byte(cmd.CTAUTMemo),
 		cmd.PlannedTotalAmount,
 		issuerTokens, cmd.ExpireHeight,
 		cmd.ReRegisterThreshold, cmd.MintThreshold,
 		uint8(len(hostedOutpoints)), uint8(len(outputs)), []byte(cmd.Memo))
 
-	serializedAutScript, err := autScript.Serialize()
-	if err != nil {
-		return nil, err
-	}
-
-	return sendAddressAbeCTAUT(w, serializedAutScript, nil,
+	return sendAddressAbeCTAUT(w, autScript, nil,
 		outputs, 0, txrules.DefaultRelayFeePerKb, nil, hostedOutpoints)
 }
 func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
@@ -2331,18 +2330,13 @@ func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 
 	witnessHash := ctautwire.AutWitnessHash(autCoinbaseTx.TxWitness)
 
-	autScript := ctaut.NewMintScript(CTAUTScriptVersion,
+	autScript := ctautapi.NewMintScript(CTAUTScriptVersion,
 		identifier,
 		vin, uint8(len(hostedOutpoints)),
 		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
 		witnessHash, []byte(cmd.Memo))
 
-	serializedAutScript, err := autScript.Serialize()
-	if err != nil {
-		return nil, err
-	}
-
-	return sendAddressAbeCTAUT(w, serializedAutScript, scriptWitness,
+	return sendAddressAbeCTAUT(w, autScript, scriptWitness,
 		outputs, 0, txrules.DefaultRelayFeePerKb, nil, hostedOutpoints)
 }
 func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
@@ -2445,12 +2439,7 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
 		witnessHash, []byte(cmd.Memo))
 
-	serializedAutScript, err := autScript.Serialize()
-	if err != nil {
-		return nil, err
-	}
-
-	return sendAddressAbeCTAUT(w, serializedAutScript, scriptWitness,
+	return sendAddressAbeCTAUT(w, autScript, scriptWitness,
 		outputs, 0, txrules.DefaultRelayFeePerKb, nil, hostedOutpoints)
 }
 func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
@@ -2557,17 +2546,12 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	scriptWitness := autTransferTx.TxWitness
 	witnessHash := ctautwire.AutWitnessHash(autTransferTx.TxWitness)
 
-	autScript := ctaut.NewBurnScript(CTAUTScriptVersion, identifier,
+	autScript := ctautapi.NewBurnScript(CTAUTScriptVersion, identifier,
 		inCTAUTTokenNum, inPlainAUTTokenNum,
 		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
 		witnessHash, []byte(cmd.Memo))
 
-	serializedAutScript, err := autScript.Serialize()
-	if err != nil {
-		return nil, err
-	}
-
-	return sendAddressAbeCTAUT(w, serializedAutScript, scriptWitness,
+	return sendAddressAbeCTAUT(w, autScript, scriptWitness,
 		outputs, 0, txrules.DefaultRelayFeePerKb, nil, hostedOutpoints)
 }
 
