@@ -17,7 +17,7 @@ import (
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/ctaut"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abewalletmlp/waddrmgr"
@@ -1557,14 +1557,14 @@ func (w *Wallet) txPqringCTToOutputsCTAUT(script []byte, scriptWitness []byte,
 	return tx, nil
 }
 
-func (w *Wallet) FindEligibleTxosForCTAUT(scriptType ctaut.AutScriptType, identifier ctaut.AutId, targetNumOrValue uint64) ([]*wire.OutPointAbe, error) {
+func (w *Wallet) FindEligibleTxosForCTAUT(scriptType ctautapi.AutScriptType, identifier ctautapi.AutId, targetNumOrValue uint64) ([]*wire.OutPointAbe, error) {
 	var err error
 	switch scriptType {
-	case ctaut.AutScriptTypeRegistration:
+	case ctautapi.AutScriptTypeRegistration:
 		return nil, nil
-	case ctaut.AutScriptTypeReRegistration:
+	case ctautapi.AutScriptTypeReRegistration:
 		fallthrough
-	case ctaut.AutScriptTypeMint:
+	case ctautapi.AutScriptTypeMint:
 		var eligibleAUTTokens []*wtxmgr.CTAUTCoin
 		err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
 			txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
@@ -1612,9 +1612,9 @@ func (w *Wallet) FindEligibleTxosForCTAUT(scriptType ctaut.AutScriptType, identi
 		}
 		return outpoints, nil
 
-	case ctaut.AutScriptTypeTransfer:
+	case ctautapi.AutScriptTypeTransfer:
 		fallthrough
-	case ctaut.AutScriptTypeBurn:
+	case ctautapi.AutScriptTypeBurn:
 		var eligibleAUTTokens []*wtxmgr.CTAUTCoin
 		err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
 			txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
@@ -2608,7 +2608,7 @@ func (w *Wallet) findEligibleTxosAbeAUT(txmgrNs walletdb.ReadBucket, minconf int
 	return eligible, nil
 }
 
-func (w *Wallet) findEligibleTxosAbeCTAUT(txmgrNs walletdb.ReadBucket, minconf int32, bs *waddrmgr.BlockStamp, identifier ctaut.AutId) ([]*wtxmgr.CTAUTCoin, error) {
+func (w *Wallet) findEligibleTxosAbeCTAUT(txmgrNs walletdb.ReadBucket, minconf int32, bs *waddrmgr.BlockStamp, identifier ctautapi.AutId) ([]*wtxmgr.CTAUTCoin, error) {
 	unspent, _, err := w.TxStore.UnspentOutputsCTAUT(txmgrNs, identifier, false) // In ABE, this result will be spendable for the logic of store
 	if err != nil {
 		return nil, err

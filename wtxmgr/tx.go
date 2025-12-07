@@ -14,7 +14,7 @@ import (
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/ctaut"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abewalletmlp/waddrmgr"
@@ -252,7 +252,7 @@ type AUTCoin struct {
 type CTAUTCoin struct {
 	TxOutput        wire.OutPointAbe
 	Height          int32
-	AUTIdentifier   ctaut.AutId
+	AUTIdentifier   ctautapi.AutId
 	IsAUTRootCoin   bool
 	AutTxoType      abecryptox.AutTxoType
 	CoinValueScript []byte
@@ -272,7 +272,7 @@ func NewAUTCoin(outpoint wire.OutPointAbe, autIdentifier []byte, isAUTRootCoin b
 	}
 }
 func NewCTAUTCoin(outpoint wire.OutPointAbe, height int32,
-	autIdentifier ctaut.AutId,
+	autIdentifier ctautapi.AutId,
 	isAUTRootCoin bool, autTxoType abecryptox.AutTxoType,
 	ctAUTCoinValueScript []byte, value uint64,
 	addrKey []byte, publicRand []byte) *CTAUTCoin {
@@ -487,7 +487,7 @@ func (utxo *CTAUTCoin) Deserialize(op *wire.OutPointAbe, v []byte) error {
 	if err != nil {
 		return err
 	}
-	utxo.AUTIdentifier = ctaut.AutId(*identifier)
+	utxo.AUTIdentifier = ctautapi.AutId(*identifier)
 	offset += autIdentifierSize
 
 	t := v[offset]
@@ -1740,11 +1740,9 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 		txi := block.TxRecords[i].MsgTx
 		txhash := txi.TxHash()
 
-		ctAUTScript, err := ctaut.ExtractAutScript(&txi)
+		ctAUTScript, err := ctautapi.DetectAndAssembleExtAutScriptFromHostTx(&txi)
 		if err != nil {
-			if !errors.Is(err, ctaut.ErrNonAutTx) {
-				log.Warnf("extract transaction %s as aut transaction err:%s", txhash, err)
-			}
+			log.Warnf("extract transaction %s as aut transaction err:%s", txhash, err)
 		}
 
 		// traverse all the inputs of a transaction
@@ -2093,13 +2091,13 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 
 				if ctAUTScript != nil {
 					identifier := ctAUTScript.AutIdentifier()
-					generatedTokens, err := ctAUTScript.GeneratedTokens()
+					generatedTokens := ctAUTScript.GeneratedTokens()
 					if err != nil {
 						return err
 					}
 
 					for t := 0; t < len(generatedTokens); t++ {
-						if ctAUTScript.Type() == ctaut.AutScriptTypeBurn && t == len(generatedTokens)-1 {
+						if ctAUTScript.Type() == ctautapi.AutScriptTypeBurn && t == len(generatedTokens)-1 {
 							continue
 						}
 
@@ -2107,8 +2105,8 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 						if token.HostOutPoint.Index == uint8(j) {
 							tmp.PackedFlag |= txoFlagCTAUTCoin
 
-							isAUTRootCoin := ctAUTScript.Type() == ctaut.AutScriptTypeRegistration ||
-								ctAUTScript.Type() == ctaut.AutScriptTypeReRegistration
+							isAUTRootCoin := ctAUTScript.Type() == ctautapi.AutScriptTypeRegistration ||
+								ctAUTScript.Type() == ctautapi.AutScriptTypeReRegistration
 
 							var autTxoType abecryptox.AutTxoType
 							var value uint64
@@ -2154,7 +2152,7 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 		}
 
 		// if the type of aut transaction is re-registration, need to consume exist root coin
-		if ctAUTScript != nil && ctAUTScript.Type() == ctaut.AutScriptTypeReRegistration {
+		if ctAUTScript != nil && ctAUTScript.Type() == ctautapi.AutScriptTypeReRegistration {
 			identifier := ctAUTScript.AutIdentifier()
 			remainRootCoins, _, err := s.UnspentOutputsCTAUT(txMgrNs, identifier, true)
 			if err != nil {
@@ -4253,7 +4251,7 @@ func (s *Store) UnspentOutputsAUT(ns walletdb.ReadBucket, autIdentifier []byte, 
 	}
 	return autCoins, utxos, nil
 }
-func (s *Store) UnspentOutputsCTAUT(ns walletdb.ReadBucket, autIdentifier ctaut.AutId, isRootCoin bool) ([]*CTAUTCoin, []*SpendableTXO, error) {
+func (s *Store) UnspentOutputsCTAUT(ns walletdb.ReadBucket, autIdentifier ctautapi.AutId, isRootCoin bool) ([]*CTAUTCoin, []*SpendableTXO, error) {
 	tokens := make([]*CTAUTCoin, 0)
 
 	var op wire.OutPointAbe
