@@ -2372,11 +2372,13 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 			return err
 		}
 		block0.SetHeight(block.Height - 2)
+
 		block1, err := abeutil.NewBlockAbe(msgBlock1) // height %3 = 1
 		if err != nil {
 			return err
 		}
 		block1.SetHeight(block.Height - 1)
+
 		block2, err := abeutil.NewBlockAbe(&msgBlock2) // height % 3 = 2
 		if err != nil {
 			return err
