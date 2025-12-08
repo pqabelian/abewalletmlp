@@ -19,7 +19,6 @@ import (
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
-	"github.com/abesuite/abec/ctaut"
 	ctautapi "github.com/abesuite/abec/ctaut/api"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abewalletmlp/wallet/txrules"
@@ -2101,20 +2100,20 @@ var CTAUTScriptVersion = ctautwire.AutScriptVersion_1
 func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.RegisterCTAUTCmd)
 
-	if len(cmd.CTAUTName) > ctaut.MaxAutNameLength {
-		return nil, fmt.Errorf("the length of name is expected no more than %d, but got %d", ctaut.MaxAutNameLength, len(cmd.CTAUTName))
+	if len(cmd.CTAUTName) > ctautapi.MaxAutNameLength {
+		return nil, fmt.Errorf("the length of name is expected no more than %d, but got %d", ctautapi.MaxAutNameLength, len(cmd.CTAUTName))
 	}
-	if len(cmd.CTAUTSymbol) > ctaut.MaxAutSymbolLength {
-		return nil, fmt.Errorf("the length of symbol is expected no more than %d, but got %d", ctaut.MaxAutSymbolLength, len(cmd.CTAUTSymbol))
+	if len(cmd.CTAUTSymbol) > ctautapi.MaxAutSymbolLength {
+		return nil, fmt.Errorf("the length of symbol is expected no more than %d, but got %d", ctautapi.MaxAutSymbolLength, len(cmd.CTAUTSymbol))
 	}
-	if len(cmd.BaseUnitName) > ctaut.MaxBaseUnitLength {
-		return nil, fmt.Errorf("the base-unit name is expected to no more than %d, but got %d", ctaut.MaxBaseUnitLength, len(cmd.BaseUnitName))
+	if len(cmd.BaseUnitName) > ctautapi.MaxBaseUnitLength {
+		return nil, fmt.Errorf("the base-unit name is expected to no more than %d, but got %d", ctautapi.MaxBaseUnitLength, len(cmd.BaseUnitName))
 	}
-	if len(cmd.SubUnitName) > ctaut.MaxSubUnitLength {
-		return nil, fmt.Errorf("the sub-unit name is expected to no more than %d, but got %d", ctaut.MaxSubUnitLength, len(cmd.SubUnitName))
+	if len(cmd.SubUnitName) > ctautapi.MaxSubUnitLength {
+		return nil, fmt.Errorf("the sub-unit name is expected to no more than %d, but got %d", ctautapi.MaxSubUnitLength, len(cmd.SubUnitName))
 	}
-	if cmd.UnitScale > ctaut.MaxAmount {
-		return nil, fmt.Errorf("the unit scale is expected to no more than %d, but got %d", ctaut.MaxAmount, cmd.UnitScale)
+	if cmd.UnitScale > ctautapi.MaxAmount {
+		return nil, fmt.Errorf("the unit scale is expected to no more than %d, but got %d", ctautapi.MaxAmount, cmd.UnitScale)
 	}
 
 	// unique issuer token check
@@ -2226,7 +2225,7 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid identifier %s", cmd.AUTIdentifier)
 	}
-	identifier := ctaut.AutId(*identifierFromCmd)
+	identifier := ctautapi.AutId(*identifierFromCmd)
 
 	hostedOutpoints, err := w.GetCTAUTOutpointsForIssuer(identifier, cmd.AUTIssuerUpdateThreshold)
 	if err != nil {
@@ -2250,7 +2249,7 @@ func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid identifier %s", cmd.AUTIdentifier)
 	}
-	identifier := ctaut.AutId(*identifierFromCmd)
+	identifier := ctautapi.AutId(*identifierFromCmd)
 
 	hostedOutpoints, err := w.GetCTAUTOutpointsForIssuer(identifier, cmd.CTAUTMintThreshold)
 	if err != nil {
@@ -2346,7 +2345,7 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid identifier %s", cmd.AUTIdentifier)
 	}
-	identifier := ctaut.AutId(*identifierFromCmd)
+	identifier := ctautapi.AutId(*identifierFromCmd)
 
 	// sort recipients
 	sort.SliceStable(cmd.Recipients, func(i, j int) bool {
@@ -2433,7 +2432,7 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	scriptWitness := autTransferTx.TxWitness
 	witnessHash := ctautwire.AutWitnessHash(autTransferTx.TxWitness)
 
-	autScript := ctaut.NewTransferScript(CTAUTScriptVersion,
+	autScript := ctautapi.NewTransferScript(CTAUTScriptVersion,
 		identifier,
 		inCTAUTTokenNum, inPlainAUTTokenNum,
 		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
@@ -2449,7 +2448,7 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid identifier %s", cmd.AUTIdentifier)
 	}
-	identifier := ctaut.AutId(*identifierFromCmd)
+	identifier := ctautapi.AutId(*identifierFromCmd)
 
 	// sort recipients
 	sort.SliceStable(cmd.Recipients, func(i, j int) bool {

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"time"
 
 	"github.com/abesuite/abec/abecryptox"
@@ -2099,7 +2100,7 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 					}
 
 					for t := 0; t < len(generatedTokens); t++ {
-						if ctAUTScript.Type() == ctaut.AutScriptTypeBurn && t == len(generatedTokens)-1 {
+						if ctAUTScript.Type() == ctautapi.AutScriptTypeBurn && t == len(generatedTokens)-1 {
 							continue
 						}
 
@@ -2107,8 +2108,8 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 						if token.HostOutPoint.Index == uint8(j) {
 							tmp.PackedFlag |= txoFlagCTAUTCoin
 
-							isAUTRootCoin := ctAUTScript.Type() == ctaut.AutScriptTypeRegistration ||
-								ctAUTScript.Type() == ctaut.AutScriptTypeReRegistration
+							isAUTRootCoin := ctAUTScript.Type() == ctautapi.AutScriptTypeRegistration ||
+								ctAUTScript.Type() == ctautapi.AutScriptTypeReRegistration
 
 							var autTxoType abecryptox.AutTxoType
 							var value uint64
@@ -2154,7 +2155,7 @@ func (s *Store) InsertBlock(txMgrNs walletdb.ReadWriteBucket, addrMgrNs walletdb
 		}
 
 		// if the type of aut transaction is re-registration, need to consume exist root coin
-		if ctAUTScript != nil && ctAUTScript.Type() == ctaut.AutScriptTypeReRegistration {
+		if ctAUTScript != nil && ctAUTScript.Type() == ctautapi.AutScriptTypeReRegistration {
 			identifier := ctAUTScript.AutIdentifier()
 			remainRootCoins, _, err := s.UnspentOutputsCTAUT(txMgrNs, identifier, true)
 			if err != nil {
