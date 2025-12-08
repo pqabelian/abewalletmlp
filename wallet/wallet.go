@@ -22,7 +22,7 @@ import (
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/ctaut"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abewalletmlp/chain"
@@ -2153,7 +2153,7 @@ func (w *Wallet) GetTxHashRequestHash(requestHash string) (res map[string]interf
 	return map[string]interface{}{"txHash": txHashStr, "status": status}, nil
 }
 
-func (w *Wallet) GetCTAUTOutpointsForIssuer(identifier ctaut.AutId, threshold uint8) ([]*wire.OutPointAbe, error) {
+func (w *Wallet) GetCTAUTOutpointsForIssuer(identifier ctautapi.AutId, threshold uint8) ([]*wire.OutPointAbe, error) {
 	var outpoints []*wire.OutPointAbe
 	var err error
 	err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
@@ -2190,7 +2190,7 @@ func (w *Wallet) GetCTAUTOutpointsForIssuer(identifier ctaut.AutId, threshold ui
 	})
 	return outpoints, err
 }
-func (w *Wallet) GetCTAUTOutpointsForTransfer(identifier ctaut.AutId, target uint64) ([]*abecryptox.AutTxInputDesc,
+func (w *Wallet) GetCTAUTOutpointsForTransfer(identifier ctautapi.AutId, target uint64) ([]*abecryptox.AutTxInputDesc,
 	[]*wire.OutPointAbe, uint8, uint8, uint64, error) {
 	var autTxInputDescs []*abecryptox.AutTxInputDesc
 	var hostedOutpoints []*wire.OutPointAbe
