@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"time"
 
 	"github.com/abesuite/abec/abecryptox"

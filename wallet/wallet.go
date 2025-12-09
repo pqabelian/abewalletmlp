@@ -23,6 +23,7 @@ import (
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	ctautapi "github.com/abesuite/abec/ctaut/api"
+	"github.com/abesuite/abec/ctaut/script"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abewalletmlp/chain"
@@ -135,6 +136,12 @@ type Wallet struct {
 	createTxRequests chan createTxRequest
 	//createTxAUTRequests   chan createTxAUTRequest
 	createTxCTAUTRequests chan createTxCTAUTRequest
+
+	createTxCTAUTRegisterRequest   chan createTxCTAUTRegisterRequest
+	createTxCTAUTReRegisterRequest chan createTxCTAUTReRegisterRequest
+	createTxCTAUTMintRequest       chan createTxCTAUTMintRequest
+	createTxCTAUTTransferRequest   chan createTxCTAUTTransferRequest
+	createTxCTAUTBurnRequest       chan createTxCTAUTBurnRequest
 
 	// Channels for the manager locker.
 	unlockRequests     chan unlockRequest
@@ -682,6 +689,131 @@ type (
 		err error
 	}
 
+	createTxCTAUTRegisterRequest struct {
+		scriptVersion              uint32
+		name                       []byte
+		symbol                     []byte
+		baseUnitName               []byte
+		subUnitName                []byte
+		unitScale                  uint64
+		autMemo                    []byte
+		plannedTotalSupply         uint64
+		issuers                    []*script.AutIssuer
+		reregistrationExpireHeight int32
+		reregisterThreshold        uint8
+		mintThreshold              uint8
+		//outStartIndex              uint8
+		//outAutRootTokenNum         uint8
+		scriptMemo []byte
+
+		autTxOutDescs []*abecryptox.AbeTxOutputDesc
+
+		minconf            int32
+		feePerKbSpecified  abeutil.Amount
+		resp               chan createTxCTAUTResponse
+		utxoSpecified      []string
+		outpoints          []*wire.OutPointAbe
+		changePrivacyLevel abecryptoxkey.PrivacyLevel
+	}
+
+	createTxCTAUTReRegisterRequest struct {
+		scriptVersion              uint32
+		identifier                 ctautapi.AutId
+		autMemo                    []byte
+		plannedTotalSupply         uint64
+		issuers                    []*script.AutIssuer
+		reregistrationExpireHeight int32
+		reregisterThreshold        uint8
+		mintThreshold              uint8
+		//inStartIndex               uint8
+		//inAutRootTokenNum          uint8
+		//outStartIndex              uint8
+		//outAutRootTokenNum         uint8
+		scriptMemo []byte
+
+		hostedOutpoints []*wire.OutPointAbe
+		autTxOutDescs   []*abecryptox.AbeTxOutputDesc
+
+		minconf            int32
+		feePerKbSpecified  abeutil.Amount
+		resp               chan createTxCTAUTResponse
+		utxoSpecified      []string
+		changePrivacyLevel abecryptoxkey.PrivacyLevel
+	}
+
+	createTxCTAUTMintRequest struct {
+		scriptVersion uint32
+		identifier    ctautapi.AutId
+		vin           uint64
+		//inStartIndex               uint8
+		//inAutRootTokenNum          uint8
+		//outStartIndex              uint8
+		autCoinbaseTxOutputDescs []*abecryptox.AutTxOutputDesc
+		outCTAutTokenNum         uint8
+		outPlainAutTokenNum      uint8
+		scriptMemo               []byte
+
+		hostedOutpoints []*wire.OutPointAbe
+		autTxOutDescs   []*abecryptox.AbeTxOutputDesc
+
+		minconf           int32
+		feePerKbSpecified abeutil.Amount
+		resp              chan createTxCTAUTResponse
+		utxoSpecified     []string
+		//outpoints          []*wire.OutPointAbe
+		changePrivacyLevel abecryptoxkey.PrivacyLevel
+	}
+
+	createTxCTAUTTransferRequest struct {
+		scriptVersion uint32
+		identifier    ctautapi.AutId
+
+		//inStartIndex               uint8
+		inCTAUTTokenNum    uint8
+		inPlainAUTTokenNum uint8
+		//outStartIndex              uint8
+		autTransferTxInputDescs  []*abecryptox.AutTxInputDesc
+		autTransferTxOutputDescs []*abecryptox.AutTxOutputDesc
+		outCTAutTokenNum         uint8
+		outPlainAutTokenNum      uint8
+		scriptMemo               []byte
+
+		hostedOutpoints []*wire.OutPointAbe
+		autTxOutDescs   []*abecryptox.AbeTxOutputDesc
+
+		minconf           int32
+		feePerKbSpecified abeutil.Amount
+		resp              chan createTxCTAUTResponse
+		utxoSpecified     []string
+		//outpoints          []*wire.OutPointAbe
+		changePrivacyLevel abecryptoxkey.PrivacyLevel
+	}
+
+	createTxCTAUTBurnRequest struct {
+		scriptVersion uint32
+		identifier    ctautapi.AutId
+
+		//inStartIndex               uint8
+		inCTAUTTokenNum    uint8
+		inPlainAUTTokenNum uint8
+		//outStartIndex              uint8
+		autTransferTxInputDescs  []*abecryptox.AutTxInputDesc
+		autTransferTxOutputDescs []*abecryptox.AutTxOutputDesc
+		outCTAutTokenNum         uint8
+		outPlainAutTokenNum      uint8
+		scriptMemo               []byte
+
+		hostedOutpoints []*wire.OutPointAbe
+		autTxOutDescs   []*abecryptox.AbeTxOutputDesc
+
+		minconf           int32
+		feePerKbSpecified abeutil.Amount
+		resp              chan createTxCTAUTResponse
+		utxoSpecified     []string
+		//outpoints          []*wire.OutPointAbe
+		changePrivacyLevel abecryptoxkey.PrivacyLevel
+	}
+
 	createTxCTAUTRequest struct {
 		script            []byte
 		scriptWitness     []byte
@@ -731,7 +863,7 @@ out:
 		//		continue
 		//	}
 		//
-		//	tx, err := w.txPqringCTToOutputsMLPAUT(txr.autTransaction, txr.txOutDescs, txr.minconf, txr.feePerKbSpecified, txr.autIssueTokenThreshold, txr.autIssueUpdateThreshold, txr.utxoSpecified)
+		//	tx, err := w.txPqringCTToOutputsMLPAUT(txr.autTransaction, txr.autTxOutDescs, txr.minconf, txr.feePerKbSpecified, txr.autIssueTokenThreshold, txr.autIssueUpdateThreshold, txr.utxoSpecified)
 		//
 		//	heldUnlock.release()
 		//	txr.resp <- createTxAUTResponse{tx, err}
@@ -746,6 +878,63 @@ out:
 				txr.txOutDescs,
 				txr.minconf, txr.feePerKbSpecified,
 				txr.utxoSpecified, txr.outpoints)
+
+			heldUnlock.release()
+			txr.resp <- createTxCTAUTResponse{tx, err}
+		case txr := <-w.createTxCTAUTRegisterRequest:
+			heldUnlock, err := w.holdUnlock()
+			if err != nil {
+				txr.resp <- createTxCTAUTResponse{nil, err}
+				continue
+			}
+
+			tx, err := w.txPqringCTToOutputsCTAUTRegister(&txr)
+
+			heldUnlock.release()
+			txr.resp <- createTxCTAUTResponse{tx, err}
+
+		case txr := <-w.createTxCTAUTReRegisterRequest:
+			heldUnlock, err := w.holdUnlock()
+			if err != nil {
+				txr.resp <- createTxCTAUTResponse{nil, err}
+				continue
+			}
+
+			tx, err := w.txPqringCTToOutputsCTAUTReRegister(&txr)
+
+			heldUnlock.release()
+			txr.resp <- createTxCTAUTResponse{tx, err}
+		case txr := <-w.createTxCTAUTMintRequest:
+			heldUnlock, err := w.holdUnlock()
+			if err != nil {
+				txr.resp <- createTxCTAUTResponse{nil, err}
+				continue
+			}
+
+			tx, err := w.txPqringCTToOutputsCTAUTMint(&txr)
+
+			heldUnlock.release()
+			txr.resp <- createTxCTAUTResponse{tx, err}
+		case txr := <-w.createTxCTAUTTransferRequest:
+			heldUnlock, err := w.holdUnlock()
+			if err != nil {
+				txr.resp <- createTxCTAUTResponse{nil, err}
+				continue
+			}
+
+			tx, err := w.txPqringCTToOutputsCTAUTTransfer(&txr)
+
+			heldUnlock.release()
+			txr.resp <- createTxCTAUTResponse{tx, err}
+
+		case txr := <-w.createTxCTAUTBurnRequest:
+			heldUnlock, err := w.holdUnlock()
+			if err != nil {
+				txr.resp <- createTxCTAUTResponse{nil, err}
+				continue
+			}
+
+			tx, err := w.txPqringCTToOutputsCTAUTBurn(&txr)
 
 			heldUnlock.release()
 			txr.resp <- createTxCTAUTResponse{tx, err}
@@ -794,7 +983,7 @@ func (w *Wallet) CreateSimpleTx(outputDescs []*abecryptox.AbeTxOutputDesc, minco
 //
 //		req := createTxAUTRequest{
 //			autTransaction:          autTransaction,
-//			txOutDescs:              outputDescs,
+//			autTxOutDescs:              outputDescs,
 //			minconf:                 minconf,
 //			feePerKbSpecified:       feePerKbSpecified,
 //			autIssueTokenThreshold:  autIssueTokenThreshold,
@@ -1845,6 +2034,407 @@ func (w *Wallet) SendOutputsCTAUT(
 	return createdTx, nil
 }
 
+func (w *Wallet) SendOutputsRegisterCTAUT(
+	scriptVersion uint32,
+	name []byte, symbol []byte,
+	baseUnitName []byte, subUnitName []byte, unitScale uint64,
+	autMemo []byte, plannedTotalSupply uint64,
+	issuers []*script.AutIssuer, reregistrationExpireHeight int32,
+	reregisterThreshold uint8, mintThreshold uint8,
+	scriptMemo []byte,
+	autTxOutDescs []*abecryptox.AbeTxOutputDesc,
+	minconf int32, feePerKbSpecified abeutil.Amount,
+	utxoSpecified []string,
+	changePrivacyLevel abecryptoxkey.PrivacyLevel) (*txauthor.AuthoredTxAbe, error) {
+	// Ensure the outputs to be created adhere to the network's consensus
+	// rules.
+	for _, txOutDesc := range autTxOutDescs {
+		err := txrules.CheckOutputDescAbe(
+			txOutDesc, txrules.DefaultRelayFeePerKb,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	req := createTxCTAUTRegisterRequest{
+		scriptVersion:              scriptVersion,
+		name:                       name,
+		symbol:                     symbol,
+		baseUnitName:               baseUnitName,
+		subUnitName:                subUnitName,
+		unitScale:                  unitScale,
+		autMemo:                    autMemo,
+		plannedTotalSupply:         plannedTotalSupply,
+		issuers:                    issuers,
+		reregistrationExpireHeight: reregistrationExpireHeight,
+		reregisterThreshold:        reregisterThreshold,
+		mintThreshold:              mintThreshold,
+		scriptMemo:                 scriptMemo,
+		autTxOutDescs:              autTxOutDescs,
+		minconf:                    minconf,
+		feePerKbSpecified:          feePerKbSpecified,
+		resp:                       make(chan createTxCTAUTResponse),
+		utxoSpecified:              utxoSpecified,
+		outpoints:                  nil,
+		changePrivacyLevel:         changePrivacyLevel,
+	}
+	w.createTxCTAUTRegisterRequest <- req
+
+	resp := <-req.resp
+
+	// it means that the transaction is created successful
+	txHash, err := w.reliablyPublishTransaction(resp.tx.Tx, "", nil)
+	if err != nil {
+		// the wallet would fetch the transaction
+		// due to error double spending
+		// And then insert the transaction into database
+		// But current do nothing? TODO 202207
+		if _, ok := err.(*ErrDoubleSpend); ok {
+			// do nothing
+		}
+		return nil, err
+	}
+
+	for i := 0; i < len(resp.tx.Tx.TxOuts); i++ {
+		printedLength := len(resp.tx.Tx.TxOuts[i].TxoScript)
+		if printedLength > 64 {
+			printedLength = 64
+		}
+		log.Debugf("tx output [%d] = %x\n", i, resp.tx.Tx.TxOuts[i].TxoScript[:printedLength])
+	}
+	// Sanity check on the returned tx hash.
+	// something error ?
+	if *txHash != resp.tx.Tx.TxHash() {
+		return nil, errors.New("tx hash mismatch")
+	}
+
+	return resp.tx, nil
+}
+
+func (w *Wallet) SendOutputsReRegisterCTAUT(
+	scriptVersion uint32,
+	identifier ctautapi.AutId,
+	autMemo []byte,
+	plannedTotalSupply uint64,
+	issuers []*script.AutIssuer, reregistrationExpireHeight int32,
+	reregisterThreshold uint8, mintThreshold uint8,
+	scriptMemo []byte,
+	hostedOutpoints []*wire.OutPointAbe,
+	autTxOutDescs []*abecryptox.AbeTxOutputDesc,
+	minconf int32, feePerKbSpecified abeutil.Amount,
+	utxoSpecified []string,
+	changePrivacyLevel abecryptoxkey.PrivacyLevel) (*txauthor.AuthoredTxAbe, error) {
+	// Ensure the outputs to be created adhere to the network's consensus
+	// rules.
+	for _, txOutDesc := range autTxOutDescs {
+		err := txrules.CheckOutputDescAbe(
+			txOutDesc, txrules.DefaultRelayFeePerKb,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	req := createTxCTAUTReRegisterRequest{
+		scriptVersion:              scriptVersion,
+		identifier:                 identifier,
+		autMemo:                    autMemo,
+		plannedTotalSupply:         plannedTotalSupply,
+		issuers:                    issuers,
+		reregistrationExpireHeight: reregistrationExpireHeight,
+		reregisterThreshold:        reregisterThreshold,
+		mintThreshold:              mintThreshold,
+		scriptMemo:                 scriptMemo,
+		hostedOutpoints:            hostedOutpoints,
+		autTxOutDescs:              autTxOutDescs,
+		minconf:                    minconf,
+		feePerKbSpecified:          feePerKbSpecified,
+		resp:                       make(chan createTxCTAUTResponse),
+		utxoSpecified:              utxoSpecified,
+		changePrivacyLevel:         changePrivacyLevel,
+	}
+	w.createTxCTAUTReRegisterRequest <- req
+
+	resp := <-req.resp
+	if resp.err != nil {
+		return nil, resp.err
+	}
+
+	// it means that the transaction is created successful
+	txHash, err := w.reliablyPublishTransaction(resp.tx.Tx, "", nil)
+	if err != nil {
+		// the wallet would fetch the transaction
+		// due to error double spending
+		// And then insert the transaction into database
+		// But current do nothing? TODO 202207
+		if _, ok := err.(*ErrDoubleSpend); ok {
+			// do nothing
+		}
+		return nil, err
+	}
+
+	for i := 0; i < len(resp.tx.Tx.TxOuts); i++ {
+		printedLength := len(resp.tx.Tx.TxOuts[i].TxoScript)
+		if printedLength > 64 {
+			printedLength = 64
+		}
+		log.Debugf("tx output [%d] = %x\n", i, resp.tx.Tx.TxOuts[i].TxoScript[:printedLength])
+	}
+	// Sanity check on the returned tx hash.
+	// something error ?
+	if *txHash != resp.tx.Tx.TxHash() {
+		return nil, errors.New("tx hash mismatch")
+	}
+
+	return resp.tx, nil
+}
+
+func (w *Wallet) SendOutputsMintCTAUT(
+	scriptVersion uint32,
+	identifier ctautapi.AutId,
+	vin uint64,
+	hostedOutpoints []*wire.OutPointAbe, // selected inputs
+	autCoinbaseTxOutputDescs []*abecryptox.AutTxOutputDesc,
+	outCTAutTokenNum uint8,
+	outPlainAutTokenNum uint8,
+	scriptMemo []byte,
+	abelTxOutDescs []*abecryptox.AbeTxOutputDesc,
+	minconf int32,
+	feePerKbSpecified abeutil.Amount,
+	utxoSpecified []string,
+	changePrivacyLevel abecryptoxkey.PrivacyLevel) (*txauthor.AuthoredTxAbe, error) {
+	// Ensure the outputs to be created adhere to the network's consensus
+	// rules.
+	for _, txOutDesc := range abelTxOutDescs {
+		err := txrules.CheckOutputDescAbe(
+			txOutDesc, txrules.DefaultRelayFeePerKb,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	req := createTxCTAUTMintRequest{
+		scriptVersion:            scriptVersion,
+		identifier:               identifier,
+		vin:                      vin,
+		autCoinbaseTxOutputDescs: autCoinbaseTxOutputDescs,
+		outCTAutTokenNum:         outCTAutTokenNum,
+		outPlainAutTokenNum:      outPlainAutTokenNum,
+		scriptMemo:               scriptMemo,
+		hostedOutpoints:          hostedOutpoints,
+		autTxOutDescs:            abelTxOutDescs,
+		minconf:                  minconf,
+		feePerKbSpecified:        feePerKbSpecified,
+		resp:                     make(chan createTxCTAUTResponse),
+		utxoSpecified:            utxoSpecified,
+		changePrivacyLevel:       changePrivacyLevel,
+	}
+	w.createTxCTAUTMintRequest <- req
+
+	resp := <-req.resp
+	if resp.err != nil {
+		return nil, resp.err
+	}
+
+	// it means that the transaction is created successful
+	txHash, err := w.reliablyPublishTransaction(resp.tx.Tx, "", nil)
+	if err != nil {
+		// the wallet would fetch the transaction
+		// due to error double spending
+		// And then insert the transaction into database
+		// But current do nothing? TODO 202207
+		if _, ok := err.(*ErrDoubleSpend); ok {
+			// do nothing
+		}
+		return nil, err
+	}
+
+	for i := 0; i < len(resp.tx.Tx.TxOuts); i++ {
+		printedLength := len(resp.tx.Tx.TxOuts[i].TxoScript)
+		if printedLength > 64 {
+			printedLength = 64
+		}
+		log.Debugf("tx output [%d] = %x\n", i, resp.tx.Tx.TxOuts[i].TxoScript[:printedLength])
+	}
+	// Sanity check on the returned tx hash.
+	// something error ?
+	if *txHash != resp.tx.Tx.TxHash() {
+		return nil, errors.New("tx hash mismatch")
+	}
+
+	return resp.tx, nil
+}
+
+func (w *Wallet) SendOutputsTransferCTAUT(
+	scriptVersion uint32,
+	identifier ctautapi.AutId,
+
+	autTransferTxInputDescs []*abecryptox.AutTxInputDesc,
+	inCTAUTTokenNum uint8, inPlainAUTTokenNum uint8,
+
+	autTransferTxOutputDescs []*abecryptox.AutTxOutputDesc,
+	outCTAutTokenNum uint8, outPlainAutTokenNum uint8,
+
+	scriptMemo []byte,
+
+	hostedOutpoints []*wire.OutPointAbe,
+	abelTxOutDescs []*abecryptox.AbeTxOutputDesc,
+
+	minconf int32,
+	feePerKbSpecified abeutil.Amount,
+	utxoSpecified []string,
+	changePrivacyLevel abecryptoxkey.PrivacyLevel) (*txauthor.AuthoredTxAbe, error) {
+	// Ensure the outputs to be created adhere to the network's consensus
+	// rules.
+	for _, txOutDesc := range abelTxOutDescs {
+		err := txrules.CheckOutputDescAbe(
+			txOutDesc, txrules.DefaultRelayFeePerKb,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	req := createTxCTAUTTransferRequest{
+		scriptVersion:            scriptVersion,
+		identifier:               identifier,
+		inCTAUTTokenNum:          inCTAUTTokenNum,
+		inPlainAUTTokenNum:       inPlainAUTTokenNum,
+		autTransferTxInputDescs:  autTransferTxInputDescs,
+		autTransferTxOutputDescs: autTransferTxOutputDescs,
+		outCTAutTokenNum:         outCTAutTokenNum,
+		outPlainAutTokenNum:      outPlainAutTokenNum,
+		scriptMemo:               scriptMemo,
+		hostedOutpoints:          hostedOutpoints,
+		autTxOutDescs:            abelTxOutDescs,
+		minconf:                  minconf,
+		feePerKbSpecified:        feePerKbSpecified,
+		resp:                     make(chan createTxCTAUTResponse),
+		utxoSpecified:            utxoSpecified,
+		changePrivacyLevel:       changePrivacyLevel,
+	}
+	w.createTxCTAUTTransferRequest <- req
+
+	resp := <-req.resp
+	if resp.err != nil {
+		return nil, resp.err
+	}
+
+	// it means that the transaction is created successful
+	txHash, err := w.reliablyPublishTransaction(resp.tx.Tx, "", nil)
+	if err != nil {
+		// the wallet would fetch the transaction
+		// due to error double spending
+		// And then insert the transaction into database
+		// But current do nothing? TODO 202207
+		if _, ok := err.(*ErrDoubleSpend); ok {
+			// do nothing
+		}
+		return nil, err
+	}
+
+	for i := 0; i < len(resp.tx.Tx.TxOuts); i++ {
+		printedLength := len(resp.tx.Tx.TxOuts[i].TxoScript)
+		if printedLength > 64 {
+			printedLength = 64
+		}
+		log.Debugf("tx output [%d] = %x\n", i, resp.tx.Tx.TxOuts[i].TxoScript[:printedLength])
+	}
+	// Sanity check on the returned tx hash.
+	// something error ?
+	if *txHash != resp.tx.Tx.TxHash() {
+		return nil, errors.New("tx hash mismatch")
+	}
+
+	return resp.tx, nil
+}
+
+func (w *Wallet) SendOutputsBurnCTAUT(
+	scriptVersion uint32,
+	identifier ctautapi.AutId,
+
+	autTransferTxInputDescs []*abecryptox.AutTxInputDesc,
+	inCTAUTTokenNum uint8, inPlainAUTTokenNum uint8,
+
+	autTransferTxOutputDescs []*abecryptox.AutTxOutputDesc,
+	outCTAutTokenNum uint8, outPlainAutTokenNum uint8,
+
+	scriptMemo []byte,
+
+	hostedOutpoints []*wire.OutPointAbe,
+	abelTxOutDescs []*abecryptox.AbeTxOutputDesc,
+
+	minconf int32,
+	feePerKbSpecified abeutil.Amount,
+	utxoSpecified []string,
+	changePrivacyLevel abecryptoxkey.PrivacyLevel) (*txauthor.AuthoredTxAbe, error) {
+	// Ensure the outputs to be created adhere to the network's consensus
+	// rules.
+	for _, txOutDesc := range abelTxOutDescs {
+		err := txrules.CheckOutputDescAbe(
+			txOutDesc, txrules.DefaultRelayFeePerKb,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	req := createTxCTAUTBurnRequest{
+		scriptVersion:            scriptVersion,
+		identifier:               identifier,
+		inCTAUTTokenNum:          inCTAUTTokenNum,
+		inPlainAUTTokenNum:       inPlainAUTTokenNum,
+		autTransferTxInputDescs:  autTransferTxInputDescs,
+		autTransferTxOutputDescs: autTransferTxOutputDescs,
+		outCTAutTokenNum:         outCTAutTokenNum,
+		outPlainAutTokenNum:      outPlainAutTokenNum,
+		scriptMemo:               scriptMemo,
+		hostedOutpoints:          hostedOutpoints,
+		autTxOutDescs:            abelTxOutDescs,
+		minconf:                  minconf,
+		feePerKbSpecified:        feePerKbSpecified,
+		resp:                     make(chan createTxCTAUTResponse),
+		utxoSpecified:            utxoSpecified,
+		changePrivacyLevel:       changePrivacyLevel,
+	}
+	w.createTxCTAUTBurnRequest <- req
+
+	resp := <-req.resp
+	if resp.err != nil {
+		return nil, resp.err
+	}
+
+	// it means that the transaction is created successful
+	txHash, err := w.reliablyPublishTransaction(resp.tx.Tx, "", nil)
+	if err != nil {
+		// the wallet would fetch the transaction
+		// due to error double spending
+		// And then insert the transaction into database
+		// But current do nothing? TODO 202207
+		if _, ok := err.(*ErrDoubleSpend); ok {
+			// do nothing
+		}
+		return nil, err
+	}
+
+	for i := 0; i < len(resp.tx.Tx.TxOuts); i++ {
+		printedLength := len(resp.tx.Tx.TxOuts[i].TxoScript)
+		if printedLength > 64 {
+			printedLength = 64
+		}
+		log.Debugf("tx output [%d] = %x\n", i, resp.tx.Tx.TxOuts[i].TxoScript[:printedLength])
+	}
+	// Sanity check on the returned tx hash.
+	// something error ?
+	if *txHash != resp.tx.Tx.TxHash() {
+		return nil, errors.New("tx hash mismatch")
+	}
+
+	return resp.tx, nil
+}
+
 // SignTransaction uses secrets of the wallet, as well as additional secrets
 // passed in by the caller, to create and add input signatures to a transaction.
 //
@@ -2399,15 +2989,20 @@ func Open(db walletdb.DB, pubPass []byte, cbs *waddrmgr.OpenCallbacks,
 		recoveryWindow:      recoveryWindow,
 		createTxRequests:    make(chan createTxRequest),
 		//createTxAUTRequests:   make(chan createTxAUTRequest),
-		createTxCTAUTRequests: make(chan createTxCTAUTRequest),
-		unlockRequests:        make(chan unlockRequest),
-		lockRequests:          make(chan struct{}),
-		holdUnlockRequests:    make(chan chan heldUnlock),
-		lockState:             make(chan bool),
-		changePassphrase:      make(chan changePassphraseRequest),
-		changePassphrases:     make(chan changePassphrasesRequest),
-		chainParams:           params,
-		quit:                  make(chan struct{}),
+		createTxCTAUTRequests:          make(chan createTxCTAUTRequest),
+		createTxCTAUTRegisterRequest:   make(chan createTxCTAUTRegisterRequest),
+		createTxCTAUTReRegisterRequest: make(chan createTxCTAUTReRegisterRequest),
+		createTxCTAUTMintRequest:       make(chan createTxCTAUTMintRequest),
+		createTxCTAUTTransferRequest:   make(chan createTxCTAUTTransferRequest),
+		createTxCTAUTBurnRequest:       make(chan createTxCTAUTBurnRequest),
+		unlockRequests:                 make(chan unlockRequest),
+		lockRequests:                   make(chan struct{}),
+		holdUnlockRequests:             make(chan chan heldUnlock),
+		lockState:                      make(chan bool),
+		changePassphrase:               make(chan changePassphraseRequest),
+		changePassphrases:              make(chan changePassphrasesRequest),
+		chainParams:                    params,
+		quit:                           make(chan struct{}),
 	}
 	w.resendUnminedTxFlag.Store(false)
 

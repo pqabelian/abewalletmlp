@@ -1393,7 +1393,7 @@ func checkValidAddress(addr []byte, chainParams *chaincfg.Params) error {
 	return nil
 }
 
-func getIssuerTokenFromAddress(cryptoAddress []byte) ([]byte, error) {
+func getIssuerCoinAddressFromCryptoAddress(cryptoAddress []byte) ([]byte, error) {
 	privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
 	if err != nil {
 		return nil, err
@@ -2135,11 +2135,11 @@ func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		cryptoAddress := instanceAddress[1 : len(instanceAddress)-32]
 		cryptoAddresses = append(cryptoAddresses, cryptoAddress)
 
-		issuerToken, err := getIssuerTokenFromAddress(cryptoAddress)
+		coinAddress, err := getIssuerCoinAddressFromCryptoAddress(cryptoAddress)
 		if err != nil {
 			return nil, err
 		}
-		issuerTokens = append(issuerTokens, ctautapi.NewAutIssuer(issuerToken))
+		issuerTokens = append(issuerTokens, ctautapi.NewAutIssuerFromCoinAddress(coinAddress))
 	}
 	if len(existIssuerToken) != len(cmd.IssuerTokens) {
 		return nil, errors.New("issuer token can not contain duplicate")
@@ -2161,16 +2161,41 @@ func registerCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		}
 	}
 
-	autScript := ctautapi.NewRegistrationScript(CTAUTScriptVersion,
+	outputDescs, err := makeOutputDescsForPairs(w, outputs, w.ChainParams())
+	if err != nil {
+		return "", err
+	}
+	tx, err := w.SendOutputsRegisterCTAUT(CTAUTScriptVersion,
 		[]byte(cmd.CTAUTName), []byte(cmd.CTAUTSymbol),
 		[]byte(cmd.BaseUnitName), []byte(cmd.SubUnitName), cmd.UnitScale,
 		[]byte(cmd.CTAUTMemo), cmd.PlannedTotalAmount,
 		issuerTokens, cmd.ExpireHeight,
 		cmd.ReRegisterThreshold, cmd.MintThreshold,
-		uint8(len(outputs)), []byte{})
+		[]byte{},
+		outputDescs,
+		0, txrules.DefaultRelayFeePerKb, nil,
+		abecryptoxkey.PrivacyLevelPSEUDONYMCT,
+	)
+	if err != nil {
+		if err == txrules.ErrAmountNegative {
+			return "", ErrNeedPositiveAmount
+		}
+		if waddrmgr.IsError(err, waddrmgr.ErrLocked) {
+			return "", &ErrWalletUnlockNeeded
+		}
+		switch err.(type) {
+		case abejson.RPCError:
+			return "", err
+		}
 
-	return sendAddressAbeCTAUT(w, autScript, nil,
-		outputs, 0, txrules.DefaultRelayFeePerKb, nil, nil)
+		return "", &abejson.RPCError{
+			Code:    abejson.ErrRPCInternal.Code,
+			Message: err.Error(),
+		}
+	}
+	txHashStr := tx.Tx.TxHash().String()
+	log.Infof("Successfully sent transaction %v", txHashStr)
+	return txHashStr, nil
 }
 
 func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
@@ -2195,11 +2220,11 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		cryptoAddress := instanceAddress[1 : len(instanceAddress)-32]
 		cryptoAddresses = append(cryptoAddresses, cryptoAddress)
 
-		issuerToken, err := getIssuerTokenFromAddress(cryptoAddress)
+		coinAddress, err := getIssuerCoinAddressFromCryptoAddress(cryptoAddress)
 		if err != nil {
 			return nil, err
 		}
-		issuerTokens = append(issuerTokens, ctautapi.NewAutIssuer(issuerToken))
+		issuerTokens = append(issuerTokens, ctautapi.NewAutIssuerFromCoinAddress(coinAddress))
 	}
 	if len(existIssuerToken) != len(cmd.IssuerTokens) {
 		return nil, errors.New("issuer token can not contain duplicate")
@@ -2220,6 +2245,10 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 			})
 		}
 	}
+	outputDescs, err := makeOutputDescsForPairs(w, outputs, w.ChainParams())
+	if err != nil {
+		return "", err
+	}
 
 	identifierFromCmd, err := chainhash.NewHashFromStr(cmd.AUTIdentifier)
 	if err != nil {
@@ -2232,15 +2261,36 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		return nil, err
 	}
 
-	autScript := ctautapi.NewReRegistrationScript(CTAUTScriptVersion,
-		identifier, []byte(cmd.CTAUTMemo),
-		cmd.PlannedTotalAmount,
+	tx, err := w.SendOutputsReRegisterCTAUT(CTAUTScriptVersion,
+		identifier,
+		[]byte(cmd.CTAUTMemo), cmd.PlannedTotalAmount,
 		issuerTokens, cmd.ExpireHeight,
 		cmd.ReRegisterThreshold, cmd.MintThreshold,
-		uint8(len(hostedOutpoints)), uint8(len(outputs)), []byte(cmd.Memo))
+		[]byte{},
+		hostedOutpoints, outputDescs,
+		0, txrules.DefaultRelayFeePerKb, nil,
+		abecryptoxkey.PrivacyLevelPSEUDONYMCT,
+	)
+	if err != nil {
+		if err == txrules.ErrAmountNegative {
+			return "", ErrNeedPositiveAmount
+		}
+		if waddrmgr.IsError(err, waddrmgr.ErrLocked) {
+			return "", &ErrWalletUnlockNeeded
+		}
+		switch err.(type) {
+		case abejson.RPCError:
+			return "", err
+		}
 
-	return sendAddressAbeCTAUT(w, autScript, nil,
-		outputs, 0, txrules.DefaultRelayFeePerKb, nil, hostedOutpoints)
+		return "", &abejson.RPCError{
+			Code:    abejson.ErrRPCInternal.Code,
+			Message: err.Error(),
+		}
+	}
+	txHashStr := tx.Tx.TxHash().String()
+	log.Infof("Successfully sent transaction %v", txHashStr)
+	return txHashStr, nil
 }
 func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.MintCTAUTCmd)
@@ -2310,33 +2360,41 @@ func mintCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	if vin != cmd.Vin {
 		return nil, fmt.Errorf("the input value is not equal to the sum of the output values")
 	}
-	autCoinbaseTx, err := abecryptox.AutCoinbaseTxGen(CTAUTScriptVersion, vin, autTxOutputDescs)
+	abelOutputDescs, err := makeOutputDescsForPairs(w, outputs, w.ChainParams())
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	if len(autCoinbaseTx.TxOuts) != len(autTxOutputDescs) {
-		return nil, fmt.Errorf("the number of outputs is not equal to the number of output descriptions")
-	}
-	valueScripts := make([][]byte, len(autCoinbaseTx.TxOuts))
-	for i := 0; i < len(autCoinbaseTx.TxOuts); i++ {
-		valueScripts[i], err = autCoinbaseTx.TxOuts[i].Serialize()
-		if err != nil {
-			return nil, err
+
+	tx, err := w.SendOutputsMintCTAUT(CTAUTScriptVersion,
+		identifier,
+		vin,
+		hostedOutpoints,
+		autTxOutputDescs, outCTAutTokenNum, outPlainAutTokenNum,
+		[]byte{},
+		abelOutputDescs,
+		0, txrules.DefaultRelayFeePerKb, nil,
+		abecryptoxkey.PrivacyLevelPSEUDONYMCT,
+	)
+	if err != nil {
+		if err == txrules.ErrAmountNegative {
+			return "", ErrNeedPositiveAmount
+		}
+		if waddrmgr.IsError(err, waddrmgr.ErrLocked) {
+			return "", &ErrWalletUnlockNeeded
+		}
+		switch err.(type) {
+		case abejson.RPCError:
+			return "", err
+		}
+
+		return "", &abejson.RPCError{
+			Code:    abejson.ErrRPCInternal.Code,
+			Message: err.Error(),
 		}
 	}
-
-	scriptWitness := autCoinbaseTx.TxWitness
-
-	witnessHash := ctautwire.AutWitnessHash(autCoinbaseTx.TxWitness)
-
-	autScript := ctautapi.NewMintScript(CTAUTScriptVersion,
-		identifier,
-		vin, uint8(len(hostedOutpoints)),
-		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
-		witnessHash, []byte(cmd.Memo))
-
-	return sendAddressAbeCTAUT(w, autScript, scriptWitness,
-		outputs, 0, txrules.DefaultRelayFeePerKb, nil, hostedOutpoints)
+	txHashStr := tx.Tx.TxHash().String()
+	log.Infof("Successfully sent transaction %v", txHashStr)
+	return txHashStr, nil
 }
 func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.TransferCTAUTCmd)
@@ -2413,33 +2471,40 @@ func transferCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 			Amount:  1,
 		})
 	}
-
-	autTransferTx, err := abecryptox.AutTransferTxGen(CTAUTScriptVersion, autTxInputDescs, autTxOutputDescs)
+	abelOutputDescs, err := makeOutputDescsForPairs(w, outputs, w.ChainParams())
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	if len(autTransferTx.TxOuts) != len(autTxOutputDescs) {
-		return nil, fmt.Errorf("the number of outputs is not equal to the number of output descriptions")
-	}
-	valueScripts := make([][]byte, len(autTransferTx.TxOuts))
-	for i := 0; i < len(autTransferTx.TxOuts); i++ {
-		valueScripts[i], err = autTransferTx.TxOuts[i].Serialize()
-		if err != nil {
-			return nil, err
+
+	tx, err := w.SendOutputsTransferCTAUT(CTAUTScriptVersion,
+		identifier,
+		autTxInputDescs, inCTAUTTokenNum, inPlainAUTTokenNum,
+		autTxOutputDescs, outCTAutTokenNum, outPlainAutTokenNum,
+		[]byte{},
+		hostedOutpoints, abelOutputDescs,
+		0, txrules.DefaultRelayFeePerKb, nil,
+		abecryptoxkey.PrivacyLevelPSEUDONYMCT,
+	)
+	if err != nil {
+		if err == txrules.ErrAmountNegative {
+			return "", ErrNeedPositiveAmount
+		}
+		if waddrmgr.IsError(err, waddrmgr.ErrLocked) {
+			return "", &ErrWalletUnlockNeeded
+		}
+		switch err.(type) {
+		case abejson.RPCError:
+			return "", err
+		}
+
+		return "", &abejson.RPCError{
+			Code:    abejson.ErrRPCInternal.Code,
+			Message: err.Error(),
 		}
 	}
-
-	scriptWitness := autTransferTx.TxWitness
-	witnessHash := ctautwire.AutWitnessHash(autTransferTx.TxWitness)
-
-	autScript := ctautapi.NewTransferScript(CTAUTScriptVersion,
-		identifier,
-		inCTAUTTokenNum, inPlainAUTTokenNum,
-		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
-		witnessHash, []byte(cmd.Memo))
-
-	return sendAddressAbeCTAUT(w, autScript, scriptWitness,
-		outputs, 0, txrules.DefaultRelayFeePerKb, nil, hostedOutpoints)
+	txHashStr := tx.Tx.TxHash().String()
+	log.Infof("Successfully sent transaction %v", txHashStr)
+	return txHashStr, nil
 }
 func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	cmd := icmd.(*abejson.BurnCTAUTCmd)
@@ -2527,31 +2592,40 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		outputs = slices.Insert(outputs, index, changePair)
 	}
 
-	autTransferTx, err := abecryptox.AutTransferTxGen(CTAUTScriptVersion, autTxInputDescs, autTxOutputDescs)
+	abelOutputDescs, err := makeOutputDescsForPairs(w, outputs, w.ChainParams())
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	if len(autTransferTx.TxOuts) != len(autTxOutputDescs) {
-		return nil, fmt.Errorf("the number of outputs is not equal to the number of output descriptions")
-	}
-	valueScripts := make([][]byte, len(autTransferTx.TxOuts))
-	for i := 0; i < len(autTransferTx.TxOuts); i++ {
-		valueScripts[i], err = autTransferTx.TxOuts[i].Serialize()
-		if err != nil {
-			return nil, err
+
+	tx, err := w.SendOutputsBurnCTAUT(CTAUTScriptVersion,
+		identifier,
+		autTxInputDescs, inCTAUTTokenNum, inPlainAUTTokenNum,
+		autTxOutputDescs, outCTAutTokenNum, outPlainAutTokenNum,
+		[]byte{},
+		hostedOutpoints, abelOutputDescs,
+		0, txrules.DefaultRelayFeePerKb, nil,
+		abecryptoxkey.PrivacyLevelPSEUDONYMCT,
+	)
+	if err != nil {
+		if err == txrules.ErrAmountNegative {
+			return "", ErrNeedPositiveAmount
+		}
+		if waddrmgr.IsError(err, waddrmgr.ErrLocked) {
+			return "", &ErrWalletUnlockNeeded
+		}
+		switch err.(type) {
+		case abejson.RPCError:
+			return "", err
+		}
+
+		return "", &abejson.RPCError{
+			Code:    abejson.ErrRPCInternal.Code,
+			Message: err.Error(),
 		}
 	}
-
-	scriptWitness := autTransferTx.TxWitness
-	witnessHash := ctautwire.AutWitnessHash(autTransferTx.TxWitness)
-
-	autScript := ctautapi.NewBurnScript(CTAUTScriptVersion, identifier,
-		inCTAUTTokenNum, inPlainAUTTokenNum,
-		outCTAutTokenNum, outPlainAutTokenNum, valueScripts,
-		witnessHash, []byte(cmd.Memo))
-
-	return sendAddressAbeCTAUT(w, autScript, scriptWitness,
-		outputs, 0, txrules.DefaultRelayFeePerKb, nil, hostedOutpoints)
+	txHashStr := tx.Tx.TxHash().String()
+	log.Infof("Successfully sent transaction %v", txHashStr)
+	return txHashStr, nil
 }
 
 // sendToAddress handles a sendtoaddress RPC request by creating a new
