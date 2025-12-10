@@ -1876,6 +1876,7 @@ func (w *Wallet) txPqringCTToOutputsCTAUTRegister(txr *createTxCTAUTRegisterRequ
 		[]byte(txr.autMemo), txr.plannedTotalSupply,
 		txr.issuers, txr.reregistrationExpireHeight,
 		txr.reregisterThreshold, txr.mintThreshold,
+		txr.privacyType,
 		uint8(outStartIndex), uint8(len(txr.autTxOutDescs)),
 		txr.scriptMemo)
 
@@ -2274,6 +2275,7 @@ func (w *Wallet) txPqringCTToOutputsCTAUTReRegister(txr *createTxCTAUTReRegister
 		txr.autMemo, txr.plannedTotalSupply,
 		txr.issuers, txr.reregistrationExpireHeight,
 		txr.reregisterThreshold, txr.mintThreshold,
+		txr.privacyType,
 		uint8(inStartIndex), uint8(len(txr.hostedOutpoints)),
 		uint8(outStartIndex), uint8(len(txr.autTxOutDescs)),
 		txr.scriptMemo,
@@ -2691,8 +2693,8 @@ func (w *Wallet) txPqringCTToOutputsCTAUTMint(txr *createTxCTAUTMintRequest) (un
 		uint8(inStartIndex), uint8(len(txr.hostedOutpoints)),
 		uint8(outStartIndex), txr.outCTAutTokenNum, txr.outPlainAutTokenNum,
 		valueScripts,
-		witnessHash,
 		txr.scriptMemo,
+		witnessHash,
 	)
 
 	packagedAutScript, err := ctautapi.PackageAutScript(autScript)
@@ -3108,8 +3110,8 @@ func (w *Wallet) txPqringCTToOutputsCTAUTTransfer(txr *createTxCTAUTTransferRequ
 		uint8(inStartIndex), txr.inCTAUTTokenNum, txr.inPlainAUTTokenNum,
 		uint8(outStartIndex), txr.outCTAutTokenNum, txr.outPlainAutTokenNum,
 		valueScripts,
-		witnessHash,
 		txr.scriptMemo,
+		witnessHash,
 	)
 
 	packagedAutScript, err := ctautapi.PackageAutScript(autScript)
@@ -3525,8 +3527,8 @@ func (w *Wallet) txPqringCTToOutputsCTAUTBurn(txr *createTxCTAUTBurnRequest) (un
 		uint8(inStartIndex), txr.inCTAUTTokenNum, txr.inPlainAUTTokenNum,
 		uint8(outStartIndex), txr.outCTAutTokenNum, txr.outPlainAutTokenNum,
 		valueScripts,
-		witnessHash,
 		txr.scriptMemo,
+		witnessHash,
 	)
 
 	packagedAutScript, err := ctautapi.PackageAutScript(autScript)

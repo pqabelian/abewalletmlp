@@ -1,14 +1,21 @@
 package wallet
 
 import (
+	"time"
+
 	"github.com/abesuite/abec/chainhash"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abewalletmlp/chain"
 	"github.com/abesuite/abewalletmlp/waddrmgr"
-	"time"
 )
 
 type mockChainClient struct {
+}
+
+func (m *mockChainClient) GetAutMetadata(id ctautapi.AutId) (*ctautapi.AutMetadata, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 var _ chain.Interface = (*mockChainClient)(nil)

@@ -1,11 +1,13 @@
 package chain
 
 import (
+	"time"
+
 	"github.com/abesuite/abec/chainhash"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abewalletmlp/waddrmgr"
 	"github.com/abesuite/abewalletmlp/wtxmgr"
-	"time"
 )
 
 // isCurrentDelta is the delta duration we'll use from the present time to
@@ -40,6 +42,7 @@ type Interface interface {
 	NotifyBlocks() error
 	Notifications() <-chan interface{} // receive the notification from block chain
 	BackEnd() string
+	GetAutMetadata(ctautapi.AutId) (*ctautapi.AutMetadata, error)
 }
 
 // Notification types.  These are defined here and processed from from reading

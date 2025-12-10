@@ -23,7 +23,6 @@ import (
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	ctautapi "github.com/abesuite/abec/ctaut/api"
-	"github.com/abesuite/abec/ctaut/script"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abewalletmlp/chain"
@@ -698,10 +697,11 @@ type (
 		unitScale                  uint64
 		autMemo                    []byte
 		plannedTotalSupply         uint64
-		issuers                    []*script.AutIssuer
+		issuers                    []*ctautapi.AutIssuer
 		reregistrationExpireHeight int32
 		reregisterThreshold        uint8
 		mintThreshold              uint8
+		privacyType                ctautapi.AutPrivacyType
 		//outStartIndex              uint8
 		//outAutRootTokenNum         uint8
 		scriptMemo []byte
@@ -721,10 +721,11 @@ type (
 		identifier                 ctautapi.AutId
 		autMemo                    []byte
 		plannedTotalSupply         uint64
-		issuers                    []*script.AutIssuer
+		issuers                    []*ctautapi.AutIssuer
 		reregistrationExpireHeight int32
 		reregisterThreshold        uint8
 		mintThreshold              uint8
+		privacyType                ctautapi.AutPrivacyType
 		//inStartIndex               uint8
 		//inAutRootTokenNum          uint8
 		//outStartIndex              uint8
@@ -923,6 +924,9 @@ out:
 			}
 
 			tx, err := w.txPqringCTToOutputsCTAUTTransfer(&txr)
+			if err != nil {
+				log.Errorf("txPqringCTToOutputsCTAUTTransfer error: %v", err)
+			}
 
 			heldUnlock.release()
 			txr.resp <- createTxCTAUTResponse{tx, err}
@@ -2039,8 +2043,9 @@ func (w *Wallet) SendOutputsRegisterCTAUT(
 	name []byte, symbol []byte,
 	baseUnitName []byte, subUnitName []byte, unitScale uint64,
 	autMemo []byte, plannedTotalSupply uint64,
-	issuers []*script.AutIssuer, reregistrationExpireHeight int32,
+	issuers []*ctautapi.AutIssuer, reregistrationExpireHeight int32,
 	reregisterThreshold uint8, mintThreshold uint8,
+	privacyType ctautapi.AutPrivacyType,
 	scriptMemo []byte,
 	autTxOutDescs []*abecryptox.AbeTxOutputDesc,
 	minconf int32, feePerKbSpecified abeutil.Amount,
@@ -2070,6 +2075,7 @@ func (w *Wallet) SendOutputsRegisterCTAUT(
 		reregistrationExpireHeight: reregistrationExpireHeight,
 		reregisterThreshold:        reregisterThreshold,
 		mintThreshold:              mintThreshold,
+		privacyType:                privacyType,
 		scriptMemo:                 scriptMemo,
 		autTxOutDescs:              autTxOutDescs,
 		minconf:                    minconf,
@@ -2082,6 +2088,9 @@ func (w *Wallet) SendOutputsRegisterCTAUT(
 	w.createTxCTAUTRegisterRequest <- req
 
 	resp := <-req.resp
+	if resp.err != nil {
+		return nil, resp.err
+	}
 
 	// it means that the transaction is created successful
 	txHash, err := w.reliablyPublishTransaction(resp.tx.Tx, "", nil)
@@ -2117,8 +2126,9 @@ func (w *Wallet) SendOutputsReRegisterCTAUT(
 	identifier ctautapi.AutId,
 	autMemo []byte,
 	plannedTotalSupply uint64,
-	issuers []*script.AutIssuer, reregistrationExpireHeight int32,
+	issuers []*ctautapi.AutIssuer, reregistrationExpireHeight int32,
 	reregisterThreshold uint8, mintThreshold uint8,
+	privacyType ctautapi.AutPrivacyType,
 	scriptMemo []byte,
 	hostedOutpoints []*wire.OutPointAbe,
 	autTxOutDescs []*abecryptox.AbeTxOutputDesc,
@@ -2145,6 +2155,7 @@ func (w *Wallet) SendOutputsReRegisterCTAUT(
 		reregistrationExpireHeight: reregistrationExpireHeight,
 		reregisterThreshold:        reregisterThreshold,
 		mintThreshold:              mintThreshold,
+		privacyType:                privacyType,
 		scriptMemo:                 scriptMemo,
 		hostedOutpoints:            hostedOutpoints,
 		autTxOutDescs:              autTxOutDescs,
