@@ -19,7 +19,6 @@ import (
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abelog"
 	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	ctautapi "github.com/abesuite/abec/ctaut/api"
@@ -669,21 +668,6 @@ type (
 		resp                  chan createTxResponse
 	}
 	createTxResponse struct {
-		tx  *txauthor.AuthoredTxAbe
-		err error
-	}
-
-	createTxAUTRequest struct {
-		autTransaction          aut.Transaction
-		txOutDescs              []*abecryptox.AbeTxOutputDesc
-		minconf                 int32
-		feePerKbSpecified       abeutil.Amount
-		autIssueTokenThreshold  uint8
-		autIssueUpdateThreshold uint8
-		resp                    chan createTxAUTResponse
-		utxoSpecified           []string
-	}
-	createTxAUTResponse struct {
 		tx  *txauthor.AuthoredTxAbe
 		err error
 	}
@@ -1926,58 +1910,6 @@ func (w *Wallet) SendOutputs(outputDescs []*abecryptox.AbeTxOutputDesc,
 	}
 
 	return createdTx, nil
-}
-
-func (w *Wallet) SendOutputsAUT(autTransaction aut.Transaction, outputDescs []*abecryptox.AbeTxOutputDesc,
-	minconf int32, feePerKbSpecified abeutil.Amount, autIssueTokenThreshold uint8, autIssueUpdateThreshold uint8, utxoSpecified []string) (*txauthor.AuthoredTxAbe, error) {
-	// Ensure the outputs to be created adhere to the network's consensus
-	// rules.
-	//for _, txOutDesc := range outputDescs {
-	//	err := txrules.CheckOutputDescAbe(
-	//		txOutDesc, txrules.DefaultRelayFeePerKb,
-	//	)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//}
-	return nil, errors.New("AUT is not supported, please use CT-AUT")
-
-	// Create the transaction and broadcast it to the network. The
-	// transaction will be added to the database in order to ensure that we
-	// continue to re-broadcast the transaction upon restarts until it has
-	// been confirmed.
-	//createdTx, err := w.CreateSimpleTxAUT(autTransaction, outputDescs, minconf, feePerKbSpecified, autIssueTokenThreshold, autIssueUpdateThreshold, utxoSpecified)
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	// it means that the transaction is created successful
-	//txHash, err := w.reliablyPublishTransaction(createdTx.Tx, "", nil)
-	//if err != nil {
-	//	// the wallet would fetch the transaction
-	//	// due to error double spending
-	//	// And then insert the transaction into database
-	//	// But current do nothing? TODO 202207
-	//	if _, ok := err.(*ErrDoubleSpend); ok {
-	//		// do nothing
-	//	}
-	//	return nil, err
-	//}
-
-	//for i := 0; i < len(createdTx.Tx.TxOuts); i++ {
-	//	printedLength := len(createdTx.Tx.TxOuts[i].TxoScript)
-	//	if printedLength > 64 {
-	//		printedLength = 64
-	//	}
-	//	log.Debugf("tx output [%d] = %x\n", i, createdTx.Tx.TxOuts[i].TxoScript[:printedLength])
-	//}
-	//// Sanity check on the returned tx hash.
-	//// something error ?
-	//if *txHash != createdTx.Tx.TxHash() {
-	//	return nil, errors.New("tx hash mismatch")
-	//}
-	//
-	//return createdTx, nil
 }
 
 func (w *Wallet) SendOutputsCTAUT(
