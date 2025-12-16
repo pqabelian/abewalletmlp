@@ -1415,48 +1415,6 @@ func sendAddressAbe(w *wallet.Wallet, amounts []abejson.Pair,
 	return res, nil
 }
 
-func sendAddressAbeCTAUT(w *wallet.Wallet,
-	script ctautapi.AutScript, scriptWitness []byte,
-	amounts []abejson.Pair,
-	minconf int32, feePerKbSpecified abeutil.Amount,
-	utxoSpecified []string, hostOutpoints []*wire.OutPointAbe) (string, error) {
-
-	packagedAutScript, err := ctautapi.PackageAutScript(script)
-	if err != nil {
-		return "", &abejson.RPCError{
-			Code:    abejson.ErrRPCInternal.Code,
-			Message: err.Error(),
-		}
-	}
-
-	outputDescs, err := makeOutputDescsForPairs(w, amounts, w.ChainParams())
-	if err != nil {
-		return "", err
-	}
-	tx, err := w.SendOutputsCTAUT(packagedAutScript, scriptWitness,
-		outputDescs, minconf, feePerKbSpecified, utxoSpecified, hostOutpoints)
-	if err != nil {
-		if err == txrules.ErrAmountNegative {
-			return "", ErrNeedPositiveAmount
-		}
-		if waddrmgr.IsError(err, waddrmgr.ErrLocked) {
-			return "", &ErrWalletUnlockNeeded
-		}
-		switch err.(type) {
-		case abejson.RPCError:
-			return "", err
-		}
-
-		return "", &abejson.RPCError{
-			Code:    abejson.ErrRPCInternal.Code,
-			Message: err.Error(),
-		}
-	}
-	txHashStr := tx.Tx.TxHash().String()
-	log.Infof("Successfully sent transaction %v", txHashStr)
-	return txHashStr, nil
-}
-
 func sendPairsAbe(w *wallet.Wallet, amounts map[string]abeutil.Amount,
 	minconf int32, feePerKbSpecified abeutil.Amount, feeSpecified abeutil.Amount, utxoSpecified []string) (string, error) {
 
@@ -1926,7 +1884,7 @@ func reRegisterCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	return txHashStr, nil
 }
 
-func generateAutOutputs(privacyType script.AutPrivacyType, recipients []*abejson.CTAUTPair, chainParams *chaincfg.Params) (
+func generateAutOutputs(privacyType ctautapi.AutPrivacyType, recipients []*abejson.CTAUTPair, chainParams *chaincfg.Params) (
 	uint64, uint8, uint8,
 	[]*abecryptox.AutTxOutputDesc, []abejson.Pair, error) {
 	target := uint64(0)
@@ -2262,7 +2220,7 @@ func burnCTAUT(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	burnedAutTxOutputDesc, outputForBurn, err := generateAutOutDesc(ctautapi.AutPrivacyTypeLimitedPublic, cmd.Recipients[len(cmd.Recipients)-1].Address, cmd.Recipients[len(cmd.Recipients)-1].Value, w.ChainParams())
+	burnedAutTxOutputDesc, outputForBurn, err := generateAutOutDesc(abecryptox.AutTxoTypePublic, cmd.Recipients[len(cmd.Recipients)-1].Address, cmd.Recipients[len(cmd.Recipients)-1].Value, w.ChainParams())
 	if err != nil {
 		return nil, err
 	}

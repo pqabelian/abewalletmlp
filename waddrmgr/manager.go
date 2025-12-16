@@ -1391,7 +1391,7 @@ func Create(cryptoScheme abecryptoxparam.CryptoScheme,
 		}
 		fmt.Println()
 
-		fmt.Printf("coinSpendKeyRootSeed\n")
+		fmt.Printf("coinSerialNumberKeyRootSeed\n")
 		for i := 0; i < len(coinSerialNumberKeyRootSeed); i++ {
 			fmt.Printf("%#02x, ", coinSerialNumberKeyRootSeed[i])
 		}

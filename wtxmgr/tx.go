@@ -4280,6 +4280,11 @@ func (s *Store) UnspentOutputsCTAUT(ns walletdb.ReadBucket, autIdentifier ctauta
 		if !ust.AUTIdentifier.IsEqual(&autIdentifier) {
 			return nil
 		}
+
+		if ust.Spent {
+			return nil
+		}
+
 		tokens = append(tokens, ust)
 
 		return nil

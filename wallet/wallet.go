@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -133,7 +132,7 @@ type Wallet struct {
 	// Channel for transaction creation requests.
 	createTxRequests chan createTxRequest
 	//createTxAUTRequests   chan createTxAUTRequest
-	createTxCTAUTRequests chan createTxCTAUTRequest
+	//createTxCTAUTRequests chan createTxCTAUTRequest
 
 	createTxCTAUTRegisterRequest   chan createTxCTAUTRegisterRequest
 	createTxCTAUTReRegisterRequest chan createTxCTAUTReRegisterRequest
@@ -852,20 +851,7 @@ out:
 		//
 		//	heldUnlock.release()
 		//	txr.resp <- createTxAUTResponse{tx, err}
-		case txr := <-w.createTxCTAUTRequests:
-			heldUnlock, err := w.holdUnlock()
-			if err != nil {
-				txr.resp <- createTxCTAUTResponse{nil, err}
-				continue
-			}
 
-			tx, err := w.txPqringCTToOutputsCTAUT(txr.script, txr.scriptWitness,
-				txr.txOutDescs,
-				txr.minconf, txr.feePerKbSpecified,
-				txr.utxoSpecified, txr.outpoints)
-
-			heldUnlock.release()
-			txr.resp <- createTxCTAUTResponse{tx, err}
 		case txr := <-w.createTxCTAUTRegisterRequest:
 			heldUnlock, err := w.holdUnlock()
 			if err != nil {
@@ -983,25 +969,6 @@ func (w *Wallet) CreateSimpleTx(outputDescs []*abecryptox.AbeTxOutputDesc, minco
 //		resp := <-req.resp
 //		return resp.tx, resp.err
 //	}
-func (w *Wallet) CreateSimpleTxCTAUT(script []byte, scriptWitness []byte,
-	outputDescs []*abecryptox.AbeTxOutputDesc,
-	minconf int32, feePerKbSpecified abeutil.Amount,
-	utxoSpecified []string, outpoints []*wire.OutPointAbe) (*txauthor.AuthoredTxAbe, error) {
-
-	req := createTxCTAUTRequest{
-		script:            script,
-		scriptWitness:     scriptWitness,
-		txOutDescs:        outputDescs,
-		minconf:           minconf,
-		feePerKbSpecified: feePerKbSpecified,
-		resp:              make(chan createTxCTAUTResponse),
-		utxoSpecified:     utxoSpecified,
-		outpoints:         outpoints,
-	}
-	w.createTxCTAUTRequests <- req
-	resp := <-req.resp
-	return resp.tx, resp.err
-}
 
 type (
 	unlockRequest struct {
@@ -1912,64 +1879,6 @@ func (w *Wallet) SendOutputs(outputDescs []*abecryptox.AbeTxOutputDesc,
 	return createdTx, nil
 }
 
-func (w *Wallet) SendOutputsCTAUT(
-	script []byte, scriptWitness []byte,
-	outputDescs []*abecryptox.AbeTxOutputDesc,
-	minconf int32, feePerKbSpecified abeutil.Amount,
-	utxoSpecified []string, hostedOutpoints []*wire.OutPointAbe) (*txauthor.AuthoredTxAbe, error) {
-	// Ensure the outputs to be created adhere to the network's consensus
-	// rules.
-	for _, txOutDesc := range outputDescs {
-		err := txrules.CheckOutputDescAbe(
-			txOutDesc, txrules.DefaultRelayFeePerKb,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Create the transaction and broadcast it to the network. The
-	// transaction will be added to the database in order to ensure that we
-	// continue to re-broadcast the transaction upon restarts until it has
-	// been confirmed.
-	createdTx, err := w.CreateSimpleTxCTAUT(
-		script, scriptWitness,
-		outputDescs,
-		minconf, feePerKbSpecified,
-		utxoSpecified, hostedOutpoints)
-	if err != nil {
-		return nil, err
-	}
-
-	// it means that the transaction is created successful
-	txHash, err := w.reliablyPublishTransaction(createdTx.Tx, "", nil)
-	if err != nil {
-		// the wallet would fetch the transaction
-		// due to error double spending
-		// And then insert the transaction into database
-		// But current do nothing? TODO 202207
-		if _, ok := err.(*ErrDoubleSpend); ok {
-			// do nothing
-		}
-		return nil, err
-	}
-
-	for i := 0; i < len(createdTx.Tx.TxOuts); i++ {
-		printedLength := len(createdTx.Tx.TxOuts[i].TxoScript)
-		if printedLength > 64 {
-			printedLength = 64
-		}
-		log.Debugf("tx output [%d] = %x\n", i, createdTx.Tx.TxOuts[i].TxoScript[:printedLength])
-	}
-	// Sanity check on the returned tx hash.
-	// something error ?
-	if *txHash != createdTx.Tx.TxHash() {
-		return nil, errors.New("tx hash mismatch")
-	}
-
-	return createdTx, nil
-}
-
 func (w *Wallet) SendOutputsRegisterCTAUT(
 	scriptVersion uint32,
 	name []byte, symbol []byte,
@@ -2691,14 +2600,17 @@ func (w *Wallet) GetCTAUTOutpointsForIssuer(identifier ctautapi.AutId, threshold
 	var err error
 	err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
 		txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
-		tokens, _, err := w.TxStore.UnspentOutputsCTAUT(txmgrNs, identifier, true)
+		tokens, spendableTXO, err := w.TxStore.UnspentOutputsCTAUT(txmgrNs, identifier, true)
 		if err != nil {
 			return err
 		}
 		outpoints = make([]*wire.OutPointAbe, 0, len(tokens))
 		addrKeyMapping := make(map[string]struct{})
-		for _, token := range tokens {
+		for i, token := range tokens {
 			if !token.IsAUTRootCoin {
+				continue
+			}
+			if spendableTXO[i] == nil {
 				continue
 			}
 			if token.Spent {
@@ -2736,37 +2648,28 @@ func (w *Wallet) GetCTAUTOutpointsForTransfer(identifier ctautapi.AutId, target 
 		txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
 		addrmgrNs := tx.ReadBucket(waddrmgrNamespaceKey)
 
-		tokens, _, err := w.TxStore.UnspentOutputsCTAUT(txmgrNs, identifier, false)
+		tokens, spendableTXO, err := w.TxStore.UnspentOutputsCTAUT(txmgrNs, identifier, false)
 		if err != nil {
 			return err
 		}
-		sort.SliceStable(tokens, func(i, j int) bool {
-			if tokens[i].AutTxoType == tokens[j].AutTxoType {
-				if tokens[i].Value == tokens[j].Value {
-					return tokens[i].Height < tokens[j].Height
-				}
-				return tokens[i].Value < tokens[j].Value
-			}
-
-			if tokens[i].AutTxoType == abecryptox.AutTxoTypeHidden &&
-				tokens[j].AutTxoType != abecryptox.AutTxoTypeHidden {
-				return true
-			}
-
-			return false
-		})
 
 		autTxInputDescs = make([]*abecryptox.AutTxInputDesc, 0, len(tokens))
 		hostedOutpoints = make([]*wire.OutPointAbe, 0, len(tokens))
 		addrKeyMapping := make(map[string]struct{})
-		for _, token := range tokens {
+		for i, token := range tokens {
 			if target == 0 {
+				break
+			}
+			if selectedValue >= target {
 				break
 			}
 			if token.IsAUTRootCoin {
 				continue
 			}
 			if token.Spent {
+				continue
+			}
+			if spendableTXO[i] == nil {
 				continue
 			}
 			_, ok := addrKeyMapping[hex.EncodeToString(token.AddrKey)]
@@ -2932,7 +2835,6 @@ func Open(db walletdb.DB, pubPass []byte, cbs *waddrmgr.OpenCallbacks,
 		recoveryWindow:      recoveryWindow,
 		createTxRequests:    make(chan createTxRequest),
 		//createTxAUTRequests:   make(chan createTxAUTRequest),
-		createTxCTAUTRequests:          make(chan createTxCTAUTRequest),
 		createTxCTAUTRegisterRequest:   make(chan createTxCTAUTRegisterRequest),
 		createTxCTAUTReRegisterRequest: make(chan createTxCTAUTReRegisterRequest),
 		createTxCTAUTMintRequest:       make(chan createTxCTAUTMintRequest),
