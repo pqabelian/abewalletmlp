@@ -3750,7 +3750,7 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 				cbOutput := make(map[wire.OutPointAbe]*SpendableTXO, len(outpoints))
 				for _, outpoint := range outpoints {
 					// check in mature output
-					if output, err := fetchSpendableTXO(wtxmgrNs, outpoint.TxHash, outpoint.Index); err == nil && output.IsCoinbase() {
+					if output, err := fetchSpendableTXO(wtxmgrNs, outpoint.TxHash, outpoint.Index); err == nil && output != nil && output.IsCoinbase() {
 						amt := abeutil.Amount(output.Amount)
 						spendableBal -= amt
 						immatureCBBal += amt
@@ -3809,7 +3809,7 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 						continue
 					}
 					// check in spend but unmined output
-					if output, err := fetchUnconfirmedTXO(wtxmgrNs, outpoint.TxHash, outpoint.Index); err == nil && output.IsCoinbase() {
+					if output, err := fetchUnconfirmedTXO(wtxmgrNs, outpoint.TxHash, outpoint.Index); err == nil && output != nil && output.IsCoinbase() {
 						amt := abeutil.Amount(output.Amount)
 						unconfirmedBal -= amt
 						immatureCBBal += amt
@@ -3879,7 +3879,7 @@ func (s *Store) rollback(manager *waddrmgr.Manager, waddrmgrNs walletdb.ReadWrit
 						continue
 					}
 					// check in spent and mined output
-					if output, err := fetchConfirmedTXO(wtxmgrNs, outpoint.TxHash, outpoint.Index); err == nil && output.IsCoinbase() {
+					if output, err := fetchConfirmedTXO(wtxmgrNs, outpoint.TxHash, outpoint.Index); err == nil && output != nil && output.IsCoinbase() {
 						amt := abeutil.Amount(output.Amount)
 						unconfirmedBal += amt
 						balance += amt
