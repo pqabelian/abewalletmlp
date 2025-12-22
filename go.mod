@@ -5,7 +5,7 @@ go 1.23.2
 toolchain go1.23.4
 
 require (
-	github.com/abesuite/abec v1.0.1-0.20251220050727-a9e6488cf59b
+	github.com/abesuite/abec v1.0.1-0.20251222142137-30413de065ad
 	github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/websocket v1.4.2
@@ -24,8 +24,8 @@ require (
 	github.com/abesuite/go-spew v1.1.1 // indirect
 	github.com/cryptosuite/kyber-go v0.0.2-alpha // indirect
 	github.com/cryptosuite/liboqs-go v0.9.5-alpha // indirect
-	github.com/cryptosuite/pqringct v0.13.1-0.20250912012454-e6f985e4800a // indirect
-	github.com/cryptosuite/pqringctx v0.13.1-0.20251020034854-8e3438f25c0a // indirect
+	github.com/cryptosuite/pqringct v0.14.0 // indirect
+	github.com/cryptosuite/pqringctx v0.14.0 // indirect
 	github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1 // indirect
 	github.com/decred/dcrd/lru v1.0.0 // indirect
 	github.com/edsrzf/mmap-go v1.1.0 // indirect
