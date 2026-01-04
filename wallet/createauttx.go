@@ -1850,30 +1850,6 @@ func (w *Wallet) FindEligibleTxosForCTAUT(scriptType ctautapi.AutScriptType, ide
 	}
 }
 
-func (w *Wallet) findEligibleTxosAbeAUT(txmgrNs walletdb.ReadBucket, minconf int32, bs *waddrmgr.BlockStamp, autName []byte) ([]*wtxmgr.AUTCoin, error) {
-	unspent, _, err := w.TxStore.UnspentOutputsAUT(txmgrNs, autName, false) // In ABE, this result will be spendable for the logic of store
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: Eventually all of these filters (except perhaps output locking)
-	// should be handled by the call to UnspentOutputs (or similar).
-	// Because one of these filters requires matching the output script to
-	// the desired account, this change depends on making wtxmgr a waddrmgr
-	// dependancy and requesting unspent outputs for a single account.
-	eligible := make([]*wtxmgr.AUTCoin, 0, len(unspent))
-	for i := range unspent {
-		output := unspent[i]
-
-		if output.Spent {
-			continue
-		}
-
-		eligible = append(eligible, output)
-	}
-	return eligible, nil
-}
-
 func (w *Wallet) findEligibleTxosAbeCTAUT(txmgrNs walletdb.ReadBucket, minconf int32, bs *waddrmgr.BlockStamp, identifier ctautapi.AutId) ([]*wtxmgr.CTAUTCoin, error) {
 	unspent, _, err := w.TxStore.UnspentOutputsCTAUT(txmgrNs, identifier, false) // In ABE, this result will be spendable for the logic of store
 	if err != nil {

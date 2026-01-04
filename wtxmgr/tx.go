@@ -4204,53 +4204,6 @@ func (s *Store) UnspentOutputs(ns walletdb.ReadBucket) ([]SpendableTXO, error) {
 	return unspent, nil
 }
 
-func (s *Store) UnspentOutputsAUT(ns walletdb.ReadBucket, autIdentifier []byte, rootCoinOnly bool) ([]*AUTCoin, []*SpendableTXO, error) {
-	autCoins := make([]*AUTCoin, 0)
-
-	var op wire.OutPointAbe
-	autEntryBucket := ns.NestedReadBucket(bucketAUTPoint)
-
-	if autEntryBucket == nil {
-		return nil, nil, errors.New("non-exist bucket for aut point")
-	}
-	err := autEntryBucket.ForEach(func(k, v []byte) error {
-		err := readCanonicalOutPointAbe(k, &op)
-		if err != nil {
-			return err
-		}
-		ust := new(AUTCoin)
-		err = ust.Deserialize(&op, v)
-		if err != nil {
-			return err
-		}
-		if rootCoinOnly && !ust.IsAUTRootCoin {
-			return nil
-		}
-		if len(autIdentifier) != 0 && !bytes.Equal(ust.AUTIdentifier, autIdentifier) {
-			return nil
-		}
-		autCoins = append(autCoins, ust)
-
-		return nil
-	})
-	if err != nil {
-		if _, ok := err.(Error); ok {
-			return nil, nil, err
-		}
-		str := "failed iterating aut point bucket"
-		return nil, nil, storeError(ErrDatabase, str, err)
-	}
-
-	utxos := make([]*SpendableTXO, len(autCoins))
-	for i, coin := range autCoins {
-		txo, err := fetchSpendableTXO(ns, coin.TxOutput.TxHash, coin.TxOutput.Index)
-		if err != nil {
-			return nil, nil, err
-		}
-		utxos[i] = txo
-	}
-	return autCoins, utxos, nil
-}
 func (s *Store) UnspentOutputsCTAUT(ns walletdb.ReadBucket, autIdentifier ctautapi.AutId, isRootCoin bool) ([]*CTAUTCoin, []*SpendableTXO, error) {
 	tokens := make([]*CTAUTCoin, 0)
 
@@ -4306,62 +4259,6 @@ func (s *Store) UnspentOutputsCTAUT(ns walletdb.ReadBucket, autIdentifier ctauta
 		utxos[i] = txo
 	}
 	return tokens, utxos, nil
-}
-
-func (s *Store) AddressAUTCoins(ns walletdb.ReadBucket, autIdentifier []byte, addrKey []byte) ([]*AUTCoin, []*SpendableTXO, []*UnconfirmedTXO, error) {
-	autCoins := make([]*AUTCoin, 0)
-
-	var op wire.OutPointAbe
-	autEntryBucket := ns.NestedReadBucket(bucketAUTPoint)
-
-	if autEntryBucket == nil {
-		return nil, nil, nil, errors.New("non-exist bucket for aut point")
-	}
-	err := autEntryBucket.ForEach(func(k, v []byte) error {
-		err := readCanonicalOutPointAbe(k, &op)
-		if err != nil {
-			return err
-		}
-		ust := new(AUTCoin)
-		err = ust.Deserialize(&op, v)
-		if err != nil {
-			return err
-		}
-
-		if len(autIdentifier) != 0 && !bytes.Equal(ust.AUTIdentifier, autIdentifier) {
-			return nil
-		}
-		if !bytes.Equal(ust.AddrKey, addrKey) {
-			return nil
-		}
-
-		autCoins = append(autCoins, ust)
-		return nil
-	})
-	if err != nil {
-		if _, ok := err.(Error); ok {
-			return nil, nil, nil, err
-		}
-		str := "failed iterating aut point bucket"
-		return nil, nil, nil, storeError(ErrDatabase, str, err)
-	}
-
-	utxos := make([]*SpendableTXO, len(autCoins))
-	unconfirmedTxos := make([]*UnconfirmedTXO, len(autCoins))
-	for i, coin := range autCoins {
-		txo, err := fetchSpendableTXO(ns, coin.TxOutput.TxHash, coin.TxOutput.Index)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		if txo == nil {
-			unconfirmedTxos[i], err = fetchUnconfirmedTXO(ns, coin.TxOutput.TxHash, coin.TxOutput.Index)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-		}
-		utxos[i] = txo
-	}
-	return autCoins, utxos, unconfirmedTxos, nil
 }
 
 // Balance returns the spendable wallet balance (total value of all unspent

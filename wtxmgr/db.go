@@ -77,8 +77,8 @@ var (
 
 	//bucketAUTEntry = []byte("autentry") // autname -> autentry [outpoint -> aut coin]
 
-	bucketAUTPoint              = []byte("autpoint") // outpoint -> aut coin
-	bucketBlockDisabledAUTPoint = []byte("blockdisabledautpoints")
+	//bucketAUTPoint              = []byte("autpoint") // outpoint -> aut coin
+	//bucketBlockDisabledAUTPoint = []byte("blockdisabledautpoints")
 
 	bucketCTAUTPoint              = []byte("ctautpoint") // outpoint -> aut coin
 	bucketBlockDisabledCTAUTPoint = []byte("blockdisabledctautpoints")
@@ -2201,15 +2201,6 @@ func createBuckets(ns walletdb.ReadWriteBucket) error {
 		return storeError(ErrDatabase, str, err)
 	}
 
-	if _, err := ns.CreateBucket(bucketAUTPoint); err != nil {
-		str := "failed to create aut point bucket"
-		return storeError(ErrDatabase, str, err)
-	}
-	if _, err := ns.CreateBucket(bucketBlockDisabledAUTPoint); err != nil {
-		str := "failed to create block disbaled aut point bucket"
-		return storeError(ErrDatabase, str, err)
-	}
-
 	if _, err := ns.CreateBucket(bucketCTAUTPoint); err != nil {
 		str := "failed to create aut point bucket"
 		return storeError(ErrDatabase, str, err)
@@ -2286,15 +2277,6 @@ func deleteBuckets(ns walletdb.ReadWriteBucket) error {
 
 	if err := ns.DeleteNestedBucket(bucketRelevantTxs); err != nil {
 		str := "failed to delete relevant transactions bucket"
-		return storeError(ErrDatabase, str, err)
-	}
-
-	if err := ns.DeleteNestedBucket(bucketAUTPoint); err != nil {
-		str := "failed to delete aut point bucket"
-		return storeError(ErrDatabase, str, err)
-	}
-	if err := ns.DeleteNestedBucket(bucketBlockDisabledAUTPoint); err != nil {
-		str := "failed to delete block disabled aut point bucket"
 		return storeError(ErrDatabase, str, err)
 	}
 

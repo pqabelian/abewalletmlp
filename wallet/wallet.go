@@ -1281,41 +1281,6 @@ func (w *Wallet) FetchSpentAndConfirmedTXOSet() ([]wtxmgr.ConfirmedTXO, error) {
 	return utxos, err
 }
 
-func (w *Wallet) FetchAUTCoins(autIdentifier string, isRootCoin bool) ([]*wtxmgr.AUTCoin, []*wtxmgr.SpendableTXO, error) {
-	var coins []*wtxmgr.AUTCoin
-	var utxos []*wtxmgr.SpendableTXO
-	var err error
-	err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
-		txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
-		coins, utxos, err = w.TxStore.UnspentOutputsAUT(txmgrNs, []byte(autIdentifier), isRootCoin)
-		return err
-	})
-	return coins, utxos, err
-}
-
-func (w *Wallet) FetchAddressAUTCoins(autIdentifier []byte, cryptoAddress []byte) ([]*wtxmgr.AUTCoin, []*wtxmgr.SpendableTXO, []*wtxmgr.UnconfirmedTXO, error) {
-	privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
-	if err != nil {
-		return nil, nil, nil, errors.New("fail to parse crypto address")
-	}
-	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
-		return nil, nil, nil, errors.New("unexpected privacy level of crypto address")
-	}
-
-	// todo: Investigate the use of DoubleHashB/DoubleHashH (to SHA3-256) in Aconcagua upgrade
-	addrKey := chainhash.DoubleHashB(coinAddress)
-
-	var coins []*wtxmgr.AUTCoin
-	var utxos []*wtxmgr.SpendableTXO
-	var unconfirmedTxos []*wtxmgr.UnconfirmedTXO
-	err = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
-		txmgrNs := tx.ReadBucket(wtxmgrNamespaceKey)
-		coins, utxos, unconfirmedTxos, err = w.TxStore.AddressAUTCoins(txmgrNs, autIdentifier, addrKey)
-		return err
-	})
-	return coins, utxos, unconfirmedTxos, nil
-}
-
 func (w *Wallet) FetchConfirmedTxHashs() ([]*chainhash.Hash, error) {
 	var txHashs []*chainhash.Hash
 	var err error
