@@ -3,7 +3,7 @@ package prompt
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/abesuite/abewalletmlp/wordlists"
+	"github.com/pqabelian/abewalletmlp/wordlists"
 	"reflect"
 	"testing"
 )

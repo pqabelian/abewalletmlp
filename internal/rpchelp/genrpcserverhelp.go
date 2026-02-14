@@ -6,8 +6,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abejson"
-	"github.com/abesuite/abewalletmlp/internal/rpchelp"
+	"github.com/pqabelian/abec/abejson"
+	"github.com/pqabelian/abewalletmlp/internal/rpchelp"
 	"log"
 	"os"
 	"strings"

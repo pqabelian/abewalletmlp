@@ -2,13 +2,13 @@ package txauthor
 
 import (
 	"errors"
-	"github.com/abesuite/abec/abecrypto"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/txscript"
-	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewalletmlp/wallet/txrules"
-	"github.com/abesuite/abewalletmlp/wallet/txsizes"
+	"github.com/pqabelian/abec/abecrypto"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/txscript"
+	"github.com/pqabelian/abec/wire"
+	"github.com/pqabelian/abewalletmlp/wallet/txrules"
+	"github.com/pqabelian/abewalletmlp/wallet/txsizes"
 )
 
 // SumOutputValues sums up the list of TxOuts and returns an Amount.

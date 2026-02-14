@@ -1,8 +1,8 @@
 package wtxmgr
 
 import (
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abewalletmlp/walletdb"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abewalletmlp/walletdb"
 	"math/rand"
 	"time"
 )

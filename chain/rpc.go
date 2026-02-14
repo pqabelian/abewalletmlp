@@ -5,11 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/rpcclient"
-	"github.com/abesuite/abewalletmlp/waddrmgr"
-	"github.com/abesuite/abewalletmlp/wtxmgr"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/rpcclient"
+	"github.com/pqabelian/abewalletmlp/waddrmgr"
+	"github.com/pqabelian/abewalletmlp/wtxmgr"
 )
 
 // RPCClient represents a persistent client connection to an abelian RPC server

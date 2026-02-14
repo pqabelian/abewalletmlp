@@ -1,8 +1,8 @@
 package wtxmgr
 
 import (
-	"github.com/abesuite/abewalletmlp/walletdb"
-	"github.com/abesuite/abewalletmlp/walletdb/migration"
+	"github.com/pqabelian/abewalletmlp/walletdb"
+	"github.com/pqabelian/abewalletmlp/walletdb/migration"
 )
 
 // TODO(abe): this slice should be re-design, we just have one version

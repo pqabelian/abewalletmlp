@@ -3,11 +3,11 @@ package chain
 import (
 	"time"
 
-	"github.com/abesuite/abec/chainhash"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
-	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewalletmlp/waddrmgr"
-	"github.com/abesuite/abewalletmlp/wtxmgr"
+	"github.com/pqabelian/abec/chainhash"
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
+	"github.com/pqabelian/abec/wire"
+	"github.com/pqabelian/abewalletmlp/waddrmgr"
+	"github.com/pqabelian/abewalletmlp/wtxmgr"
 )
 
 // isCurrentDelta is the delta duration we'll use from the present time to

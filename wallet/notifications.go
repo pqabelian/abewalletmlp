@@ -3,11 +3,11 @@ package wallet
 import (
 	"sync"
 
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewalletmlp/walletdb"
-	"github.com/abesuite/abewalletmlp/wtxmgr"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
+	"github.com/pqabelian/abewalletmlp/walletdb"
+	"github.com/pqabelian/abewalletmlp/wtxmgr"
 )
 
 // TODO: It would be good to send errors during notification creation to the rpc

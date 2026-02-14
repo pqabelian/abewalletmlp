@@ -3,7 +3,7 @@
 
 package rpchelp
 
-import "github.com/abesuite/abec/abejson"
+import "github.com/pqabelian/abec/abejson"
 
 // Common return types.
 var (

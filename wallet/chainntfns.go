@@ -3,12 +3,12 @@ package wallet
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewalletmlp/chain"
-	"github.com/abesuite/abewalletmlp/waddrmgr"
-	"github.com/abesuite/abewalletmlp/walletdb"
-	"github.com/abesuite/abewalletmlp/wtxmgr"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
+	"github.com/pqabelian/abewalletmlp/chain"
+	"github.com/pqabelian/abewalletmlp/waddrmgr"
+	"github.com/pqabelian/abewalletmlp/walletdb"
+	"github.com/pqabelian/abewalletmlp/wtxmgr"
 	"time"
 )
 

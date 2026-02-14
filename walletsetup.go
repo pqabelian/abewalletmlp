@@ -4,20 +4,20 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/abesuite/abewalletmlp/wordlists"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abewalletmlp/wordlists"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewalletmlp/internal/prompt"
-	"github.com/abesuite/abewalletmlp/wallet"
-	"github.com/abesuite/abewalletmlp/walletdb"
-	_ "github.com/abesuite/abewalletmlp/walletdb/bdb"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/wire"
+	"github.com/pqabelian/abewalletmlp/internal/prompt"
+	"github.com/pqabelian/abewalletmlp/wallet"
+	"github.com/pqabelian/abewalletmlp/walletdb"
+	_ "github.com/pqabelian/abewalletmlp/walletdb/bdb"
 )
 
 // networkDir returns the directory name of a network directory to hold wallet

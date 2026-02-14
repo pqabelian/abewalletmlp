@@ -1,7 +1,7 @@
 package cfgutil
 
 import (
-	"github.com/abesuite/abec/abeutil"
+	"github.com/pqabelian/abec/abeutil"
 	"strconv"
 	"strings"
 )

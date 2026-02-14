@@ -3,11 +3,11 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abewalletmlp/waddrmgr"
-	"github.com/abesuite/abewalletmlp/walletdb"
-	"github.com/abesuite/abewalletmlp/wtxmgr"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abewalletmlp/waddrmgr"
+	"github.com/pqabelian/abewalletmlp/walletdb"
+	"github.com/pqabelian/abewalletmlp/wtxmgr"
 	"os"
 	"path/filepath"
 

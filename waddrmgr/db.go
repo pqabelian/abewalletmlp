@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abewalletmlp/walletdb"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abewalletmlp/walletdb"
 )
 
 const (

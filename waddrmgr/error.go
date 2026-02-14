@@ -2,7 +2,7 @@ package waddrmgr
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abeutil/hdkeychain"
+	"github.com/pqabelian/abec/abeutil/hdkeychain"
 	"strconv"
 )
 

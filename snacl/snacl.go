@@ -6,7 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/binary"
 	"errors"
-	"github.com/abesuite/abewalletmlp/internal/zero"
+	"github.com/pqabelian/abewalletmlp/internal/zero"
 	"golang.org/x/crypto/nacl/secretbox"
 	"golang.org/x/crypto/scrypt"
 	"io"

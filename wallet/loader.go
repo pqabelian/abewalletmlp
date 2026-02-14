@@ -2,12 +2,12 @@ package wallet
 
 import (
 	"errors"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abewalletmlp/internal/prompt"
-	"github.com/abesuite/abewalletmlp/waddrmgr"
-	"github.com/abesuite/abewalletmlp/walletdb"
-	"github.com/abesuite/abewalletmlp/wtxmgr"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abewalletmlp/internal/prompt"
+	"github.com/pqabelian/abewalletmlp/waddrmgr"
+	"github.com/pqabelian/abewalletmlp/walletdb"
+	"github.com/pqabelian/abewalletmlp/wtxmgr"
 	"os"
 	"path/filepath"
 	"sync"

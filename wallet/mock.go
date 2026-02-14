@@ -3,11 +3,11 @@ package wallet
 import (
 	"time"
 
-	"github.com/abesuite/abec/chainhash"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
-	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewalletmlp/chain"
-	"github.com/abesuite/abewalletmlp/waddrmgr"
+	"github.com/pqabelian/abec/chainhash"
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
+	"github.com/pqabelian/abec/wire"
+	"github.com/pqabelian/abewalletmlp/chain"
+	"github.com/pqabelian/abewalletmlp/waddrmgr"
 )
 
 type mockChainClient struct {

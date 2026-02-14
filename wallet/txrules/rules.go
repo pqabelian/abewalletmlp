@@ -6,11 +6,11 @@ package txrules
 import (
 	"errors"
 
-	"github.com/abesuite/abec/abecrypto"
-	"github.com/abesuite/abec/abecryptox"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/txscript"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abecrypto"
+	"github.com/pqabelian/abec/abecryptox"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/txscript"
+	"github.com/pqabelian/abec/wire"
 )
 
 // DefaultRelayFeePerKb is the default minimum relay fee policy for a mempool.

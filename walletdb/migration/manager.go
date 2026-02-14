@@ -2,7 +2,7 @@ package migration
 
 import (
 	"errors"
-	"github.com/abesuite/abewalletmlp/walletdb"
+	"github.com/pqabelian/abewalletmlp/walletdb"
 	"sort"
 )
 

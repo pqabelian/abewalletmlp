@@ -3,9 +3,9 @@ package waddrmgr
 import (
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abewalletmlp/walletdb"
-	"github.com/abesuite/abewalletmlp/walletdb/migration"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abewalletmlp/walletdb"
+	"github.com/pqabelian/abewalletmlp/walletdb/migration"
 	"time"
 )
 

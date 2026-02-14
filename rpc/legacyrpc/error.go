@@ -2,7 +2,7 @@ package legacyrpc
 
 import (
 	"errors"
-	"github.com/abesuite/abec/abejson"
+	"github.com/pqabelian/abec/abejson"
 )
 
 // TODO(jrick): There are several error paths which 'replace' various errors

@@ -3,10 +3,10 @@ package prompt
 import (
 	"bytes"
 	"errors"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abewalletmlp/wordlists"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/chainhash"
 	"github.com/pqabelian/abelian-aip11-go"
+	"github.com/pqabelian/abewalletmlp/wordlists"
 	"github.com/tyler-smith/go-bip39"
 	aip11wordlists "github.com/tyler-smith/go-bip39/wordlists"
 	"strings"

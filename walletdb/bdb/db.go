@@ -1,7 +1,7 @@
 package bdb
 
 import (
-	"github.com/abesuite/abewalletmlp/walletdb"
+	"github.com/pqabelian/abewalletmlp/walletdb"
 	"go.etcd.io/bbolt"
 	"io"
 	"os"

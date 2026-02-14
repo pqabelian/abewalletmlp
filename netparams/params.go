@@ -1,6 +1,6 @@
 package netparams
 
-import "github.com/abesuite/abec/chaincfg"
+import "github.com/pqabelian/abec/chaincfg"
 
 // Params is used to group parameters for various networks such as the main
 // network and test networks.

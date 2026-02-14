@@ -2,7 +2,7 @@ package bdb
 
 import (
 	"fmt"
-	"github.com/abesuite/abewalletmlp/walletdb"
+	"github.com/pqabelian/abewalletmlp/walletdb"
 )
 
 const (

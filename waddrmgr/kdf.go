@@ -3,7 +3,7 @@ package waddrmgr
 import (
 	_ "crypto"
 	"fmt"
-	"github.com/abesuite/abewalletmlp/waddrmgr/internal"
+	"github.com/pqabelian/abewalletmlp/waddrmgr/internal"
 )
 
 // (1) the PRFOutputBytesLen should be the same as the RandBytesLen required by the underlying crypto-scheme.

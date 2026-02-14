@@ -1,10 +1,10 @@
 package wallet
 
 import (
-	"github.com/abesuite/abec/abelog"
-	"github.com/abesuite/abewalletmlp/waddrmgr"
-	"github.com/abesuite/abewalletmlp/walletdb/migration"
-	"github.com/abesuite/abewalletmlp/wtxmgr"
+	"github.com/pqabelian/abec/abelog"
+	"github.com/pqabelian/abewalletmlp/waddrmgr"
+	"github.com/pqabelian/abewalletmlp/walletdb/migration"
+	"github.com/pqabelian/abewalletmlp/wtxmgr"
 )
 
 // log is a logger that is initialized with no output filters.  This

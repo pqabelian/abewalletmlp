@@ -8,10 +8,10 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abewalletmlp/walletdb"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
+	"github.com/pqabelian/abewalletmlp/walletdb"
 )
 
 // Naming

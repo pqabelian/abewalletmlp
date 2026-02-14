@@ -1,6 +1,6 @@
 package legacyrpc
 
-import "github.com/abesuite/abec/abelog"
+import "github.com/pqabelian/abec/abelog"
 
 var log = abelog.Disabled
 
