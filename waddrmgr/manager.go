@@ -1385,35 +1385,6 @@ func Create(cryptoScheme abecryptoxparam.CryptoScheme,
 		if err != nil {
 			return err
 		}
-		fmt.Printf("coinSpendKeyRootSeed\n")
-		for i := 0; i < len(coinSpendKeyRootSeed); i++ {
-			fmt.Printf("%#02x, ", coinSpendKeyRootSeed[i])
-		}
-		fmt.Println()
-
-		fmt.Printf("coinSerialNumberKeyRootSeed\n")
-		for i := 0; i < len(coinSerialNumberKeyRootSeed); i++ {
-			fmt.Printf("%#02x, ", coinSerialNumberKeyRootSeed[i])
-		}
-		fmt.Println()
-
-		fmt.Printf("coinValueKeyRootSeed\n")
-		for i := 0; i < len(coinValueKeyRootSeed); i++ {
-			fmt.Printf("%#02x, ", coinValueKeyRootSeed[i])
-		}
-		fmt.Println()
-
-		fmt.Printf("coinDetectorRootKey\n")
-		for i := 0; i < len(coinDetectorRootKey); i++ {
-			fmt.Printf("%#02x, ", coinDetectorRootKey[i])
-		}
-		fmt.Println()
-
-		fmt.Printf("coinValueKeyRootSeedAut\n")
-		for i := 0; i < len(coinValueKeyRootSeedAut); i++ {
-			fmt.Printf("%#02x, ", coinValueKeyRootSeedAut[i])
-		}
-		fmt.Println()
 
 		coinSpKeyRootSeedEnc, err := cryptoKeySeed.Encrypt(coinSpendKeyRootSeed)
 		if err != nil {
